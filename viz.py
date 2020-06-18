@@ -268,22 +268,22 @@ class VIZ:
         if sflag:
             self.plot_as_emf(fig1,filename=self.directory/"client"/'figures'/'slf_idr_s')
             self.plot_as_png(fig1,filename=self.directory/"client"/'figures'/'slf_idr_s')
-            self.plot_as_emf(fig2,filename=self.directory/"client"/'figures'/'slf_idr_ns')
-            self.plot_as_png(fig2,filename=self.directory/"client"/'figures'/'slf_idr_ns')
-            self.plot_as_emf(fig3,filename=self.directory/"client"/'figures'/'slf_pfa_ns')
-            self.plot_as_png(fig3,filename=self.directory/"client"/'figures'/'slf_pfa_ns')
-            self.plot_as_emf(fig4,filename=self.directory/"client"/'figures'/'edp_loss_idr_s')
-            self.plot_as_png(fig4,filename=self.directory/"client"/'figures'/'edp_loss_idr_s')
-            self.plot_as_emf(fig5,filename=self.directory/"client"/'figures'/'edp_loss_idr_ns')
-            self.plot_as_png(fig5,filename=self.directory/"client"/'figures'/'edp_loss_idr_ns')
-            self.plot_as_emf(fig6,filename=self.directory/"client"/'figures'/'edp_loss_pfa_ns')
-            self.plot_as_png(fig6,filename=self.directory/"client"/'figures'/'edp_loss_pfa_ns')
-            self.plot_as_emf(fig7,filename=self.directory/"client"/'figures'/'loss_idr_s')
-            self.plot_as_png(fig7,filename=self.directory/"client"/'figures'/'loss_idr_s')
-            self.plot_as_emf(fig8,filename=self.directory/"client"/'figures'/'loss_idr_ns')
-            self.plot_as_png(fig8,filename=self.directory/"client"/'figures'/'loss_idr_ns')
-            self.plot_as_emf(fig9,filename=self.directory/"client"/'figures'/'loss_pfa_ns')
-            self.plot_as_png(fig9,filename=self.directory/"client"/'figures'/'loss_pfa_ns')
+            self.plot_as_emf(fig2,filename=self.directory/"client"/'figures'/'slf_pfa_ns')
+            self.plot_as_png(fig2,filename=self.directory/"client"/'figures'/'slf_pfa_ns')
+            self.plot_as_emf(fig3,filename=self.directory/"client"/'figures'/'comp1_frag')
+            self.plot_as_png(fig3,filename=self.directory/"client"/'figures'/'comp1_frag')
+#            self.plot_as_emf(fig4,filename=self.directory/"client"/'figures'/'edp_loss_idr_s')
+#            self.plot_as_png(fig4,filename=self.directory/"client"/'figures'/'edp_loss_idr_s')
+#            self.plot_as_emf(fig5,filename=self.directory/"client"/'figures'/'edp_loss_idr_ns')
+#            self.plot_as_png(fig5,filename=self.directory/"client"/'figures'/'edp_loss_idr_ns')
+#            self.plot_as_emf(fig6,filename=self.directory/"client"/'figures'/'edp_loss_pfa_ns')
+#            self.plot_as_png(fig6,filename=self.directory/"client"/'figures'/'edp_loss_pfa_ns')
+#            self.plot_as_emf(fig7,filename=self.directory/"client"/'figures'/'loss_idr_s')
+#            self.plot_as_png(fig7,filename=self.directory/"client"/'figures'/'loss_idr_s')
+#            self.plot_as_emf(fig8,filename=self.directory/"client"/'figures'/'loss_idr_ns')
+#            self.plot_as_png(fig8,filename=self.directory/"client"/'figures'/'loss_idr_ns')
+#            self.plot_as_emf(fig9,filename=self.directory/"client"/'figures'/'loss_pfa_ns')
+#            self.plot_as_png(fig9,filename=self.directory/"client"/'figures'/'loss_pfa_ns')
         
         return data
     
@@ -291,7 +291,7 @@ class VIZ:
 if __name__ == "__main__":
     viz = VIZ()
     viz.createFolder(viz.directory/"client"/"figures")
-    slf = viz.visualize_slf("slf1.pkl", showplot=True, sflag=False)
+    slf = viz.visualize_slf("slf1.pkl", showplot=True, sflag=True)
 
 
 
