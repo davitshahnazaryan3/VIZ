@@ -1,6 +1,6 @@
 # Visualization AID
 
-Help to postprocess analysis results, visualize and export them
+Aid to postprocess analysis results, visualize and export them
 
 **Required packages**
 
