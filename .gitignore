@@ -1,3 +1,6 @@
 
 venv/*
-client/figures/*
+sample/figures/*
+sample/archive/*
+.idea/*
+viz1.py
