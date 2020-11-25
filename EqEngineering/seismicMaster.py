@@ -1,5 +1,5 @@
 from EqEngineering.hazard import Hazard
-from EqEngineering.slf import Slf
+from EqEngineering.slf import SLF
 from EqEngineering.spo import Spo
 from EqEngineering.ida import Ida
 from EqEngineering.loss import Loss
@@ -57,3 +57,29 @@ class SeismicMaster:
                 h = pickle.load(f)
                 fig = hazard.fitted_hazard(h)
                 self.exportFigure(fig, "fittedHazard")
+
+        if self.export or self.exportMiser:
+            print("[SUCCESS] Hazard functions have been exported!")
+        else:
+            print("[SUCCESS] Hazard functions have been plotted!")
+
+    def slfs(self, path, nst, n_to_plot=100, geometry=0, normalizeCost=1, pflag=True):
+        """
+        Plots graphs separately for each storey and Performance group (i.e. 3 groups x n storeys)
+        :param path: str                    Directory of SLF output files
+        :param nst: int
+        :param n_to_plot: int               Number of scatter points to plot
+        :param geometry: int
+        :param normalizeCost: float
+        :param pflag: bool
+        """
+        slf = SLF(path, nst, n_to_plot, geometry, normalizeCost)
+        if pflag:
+            figs, edp_cols = slf.read_slfs()
+            for i in range(len(figs)):
+                self.exportFigure(figs[i], edp_cols[i])
+
+        if self.export or self.exportMiser:
+            print("[SUCCESS] Storey loss functions have been exported!")
+        else:
+            print("[SUCCESS] Storey loss functions have been plotted!")

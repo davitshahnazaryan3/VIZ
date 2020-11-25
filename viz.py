@@ -35,8 +35,16 @@ if __name__ == "__main__":
     exportDir = Path.cwd().parents[0] / ".applications/case1/figures"
     viz = VIZ(exportDir)
 
-    # Hazard plotting
-    pathHazard = Path.cwd().parents[0] / ".applications/case1/Hazard-LAquila-Soil-C.pkl"
-    period = 1.05
-    seismic = SeismicMaster(export=True, exportDir=exportDir)
-    seismic.hazard(pathHazard, period=period)
+    # Call the earthquake engineering master file
+    seismic = SeismicMaster(export=False, exportDir=exportDir)
+
+    # # Hazard plotting
+    # pathHazard = Path.cwd().parents[0] / ".applications/case1/Hazard-LAquila-Soil-C.pkl"
+    # period = 1.05
+    # seismic.hazard(pathHazard, period=period)
+
+    # # SLF plotting
+    # path = Path.cwd().parents[0] / ".applications/case1/Output/slfoutput"
+    # nst = 5
+    # seismic.slfs(path, nst=nst)
+

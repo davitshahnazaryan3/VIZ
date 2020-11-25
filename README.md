@@ -4,7 +4,7 @@ Aid to postprocess analysis results, visualize and export them
 
 **Required packages**
 
-numpy, pandas, matplotlib
+numpy, pandas, matplotlib, xlrd, re
 
 Requires inkscape: for vectorized high quality image exports
 

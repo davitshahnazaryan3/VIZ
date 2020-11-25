@@ -1,320 +1,319 @@
 import matplotlib.pyplot as plt
+import os
+import pickle
+import re
+import pandas as pd
+import numpy as np
 
 
-class Slf:
-    def __init__(self):
-        pass
-
-    def visualize_slf(self, filename, edps=None, showplot=False, sflag=False, n_to_plot=100):
+class SLF:
+    def __init__(self, path, nst, n_to_plot=100, geometry=0, normalizeCost=1):
         """
-        Visualizing graphs for the SLF generator
-        :param filename: str                    File name, e.g. '*\filename.extension'
-        :param edps: list(str)                  EDPs as keys used for accessing data and plotting, e.g. IDR S, IDR, PFA,
-                                                IDR NS, PFA NS
-        :param showplot: bool                   Whether to plot the figures in the interpreter or not
-        :param sflag: bool                      Whether to save the figures or not
-        :param n_to_plot: int                   Number of simulations to plot
+        Plots graphs separately for each storey and Performance group (i.e. 3 groups x n storeys)
+        :param path: str                    Directory of SLF output files
+        :param nst: int
+        :param n_to_plot: int               Number of scatter points to plot
+        :param geometry: int
+        :param normalizeCost: float
         """
-        if edps is None:
-            edps = ["IDR S", "IDR NS", "PFA NS"]
+        # Default color patterns
+        self.color_grid = ['#840d81', '#6c4ba6', '#407bc1', '#18b5d8', '#01e9f5',
+                           '#cef19d', '#a6dba7', '#77bd98', '#398684', '#094869']
+        self.geometry = geometry
+        self.path = path
+        self.normalizeCost = normalizeCost
+        self.nst = nst
+        self.n_to_plot = n_to_plot
+        # Keys for identifying structural and non-structural components
+        self.S_KEY = 1
+        self.NS_KEY = 2
+        self.PERF_GROUP = ["PSD_S", "PSD_NS", "PFA_NS"]
+        # Default direction of SLFs to use if "2D" Structure is being considered
+        self.DIRECTION = 1
 
-        filepath = self.directory / "client" / filename
+    def read_slfs(self):
+        """
+        Reads SLF files
+        :return: figure objects
+        """
+        # Check whether a .csv or .pickle is provided
+        for file in os.listdir(self.path):
+            if not os.path.isdir(self.path / file) and (file.endswith(".csv") or file.endswith(".xlsx")):
+                # Read the SLFs
+                loss, edp_cols, edp_range = self.slfs_csv()
+                # Generate figure/s
+                figs = self.plot_csv(loss, edp_range, edp_cols)
+                return figs, edp_cols
+            
+            elif not os.path.isdir(self.path / file) and (file.endswith(".pickle") or file.endswith(".pkl")):
+                # Read the SLFs
+                loss, edps = self.slfs_pickle()
+                # Generate figure/s
+                figs, names = self.plot_pickle(loss, edps)
+                return figs, names
 
-        if filename.endswith(".pkl") or filename.endswith(".pickle"):
-            plot_tag = filename.replace(".pkl", "")
-            with open(filepath, 'rb') as file:
-                data = pickle.load(file)
-        else:
-            raise ValueError("[EXCEPTION] Currently only pickle or pkl file format is accepted")
-
-        for edp in edps:
-            if "IDR" in edp or "IDR NS" in edp or "IDR S" in edp:
-                try:
-                    idr_range = data["IDR S"]["fragilities"]["EDP"]
-                except:
-                    idr_range = data["IDR"]["fragilities"]["EDP"]
-
-        for edp in edps:
-            if "PFA" in edp:
-                try:
-                    pfa_range = data["PFA NS"]["fragilities"]["EDP"]
-                except:
-                    pfa_range = data["PFA"]["fragilities"]["EDP"]
-
-        #        # IDR sensitive structural and non-structural performance group SLFs
-        #        if "IDR" in edps or "IDR NS" in edps or "IDR S" in edps:
-        #            fig1, ax = plt.subplots(figsize=(4, 3), dpi=100)
-        #            cnt = 0
-        #            for key in data["SLFs"]:
-        #                y = data["SLFs"][key]
-        #                if "IDR" in key:
-        #                    plt.plot(idr_range, y, color=self.color_grid[cnt], label=key)
-        #                cnt += 1
-        #            plt.xlabel('IDR')
-        #            plt.ylabel('E(L | IDR)')
-        #            plt.xlim(0, 0.2)
-        #            plt.ylim(0, 1)
-        #            plt.grid(True, which="major", axis="both", ls="--", lw=1.0)
-        #            plt.legend(frameon=False, loc="upper right", fontsize=10)
-        #            if not showplot:
-        #                plt.close()
-        #        else:
-        #            fig1 = None
-        #
-        #        # PFA sensitive non-structural performance group SLFs
-        #        if "PFA" in edps or "PFA NS" in edps:
-        #            fig2, ax = plt.subplots(figsize=(4, 3), dpi=100)
-        #            cnt = 0
-        #            for key in data["SLFs"]:
-        #                y = data["SLFs"][key]
-        #                if "PFA" in key:
-        #                    plt.plot(pfa_range, y, color=self.color_grid[cnt], label=key)
-        #                cnt += 1
-        #            plt.xlabel('PFA [g]')
-        #            plt.ylabel('E(L | IDR)')
-        #            plt.xlim(0, 10)
-        #            plt.ylim(0, 1)
-        #            plt.grid(True, which="major", axis="both", ls="--", lw=1.0)
-        #            plt.legend(frameon=False, loc="upper right", fontsize=10)
-        #            if not showplot:
-        #                plt.close()
-        #        else:
-        #            fig2 = None
-        #
-        #        # Sample fragility function
-        #        component = data[edps[0]]["fragilities"]["ITEMs"][4]
-        #        fig3, ax = plt.subplots(figsize=(4, 3), dpi=100)
-        #        cnt = 0
-        #        for key in component.keys():
-        #            plt.plot(idr_range, component[key], color=self.color_grid[cnt], label=key)
-        #            cnt += 1
-        #        plt.xlabel('IDR')
-        #        plt.ylabel('Probability of exceeding DS')
-        #        plt.xlim(0, 0.2)
-        #        plt.ylim(0, 1)
-        #        plt.grid(True, which="major", axis="both", ls="--", lw=1.0)
-        #        plt.legend(frameon=False, loc="upper right", fontsize=10)
-        #        if not showplot:
-        #            plt.close()
-
-        #        # EDP vs loss ratio
-        #        for edp in edps:
-        #            if edp in ["IDR", "IDR NS", "IDR S"]:
-        #                edp_range = idr_range
-        #                xlim = [0, 0.2]
-        #                ylim = [0, 1.4]
-        #                xlabel = edp[0:3]
-        #            else:
-        #                edp_range = pfa_range
-        #                xlim = [0, 10.0]
-        #                ylim = [0, 1.4]
-        #                xlabel = edp[0:3] + " [g]"
-        #
-        #            fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
-        #            cnt = 0
-        #            for key in data[edp]["edp_dv_fitted"].keys():
-        #                y = data[edp]["edp_dv_fitted"][key]
-        #                plt.plot(edp_range, y, color=self.color_grid[cnt], label=key)
-        #                cnt += 2
-        #            plt.xlabel(xlabel)
-        #            plt.ylabel("Loss Ratio")
-        #            plt.xlim(xlim)
-        #            plt.ylim(ylim)
-        #            plt.grid(True, which="major", axis="both", ls="--", lw=1.0)
-        #            plt.legend(frameon=False, loc="best", fontsize=10)
-        #            if not showplot:
-        #                plt.close()
-        #            if sflag:
-        #                self.plot_as_emf(fig,filename=self.directory/"client"/'figures'/f'edp_loss_{edp}_'
-        #                                                                                f'{plot_tag}'.replace(" ", "_"))
-        #                self.plot_as_png(fig,filename=self.directory/"client"/'figures'/f'edp_loss_{edp}_'
-        #                                                                                f'{plot_tag}'.replace(" ", "_"))
-
-        # %% Loss in euro vs EDP (including the simulation scatter, the fractiles of
-        #  the simulations and the fitted fractiles, and the fitted mean)
-        # IDR-S
-        #        idr_range = idr_range*100
-        #        for edp in edps:
-        #            component = data[edp]
-        #
-        #            fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
-        #            if edp == "IDR" or edp == "IDR NS" or edp == "IDR S":
-        #                edp_range = idr_range
-        #            else:
-        #                edp_range = pfa_range
-        #
-        #            cnt = 0
-        #            for key in component["edp_dv_euro"].keys():
-        #                # Fractile loss curves, Fitted loss in Currency
-        #                y_fit = component["edp_dv_euro"][key] / 10.0**3
-        #                # Fractile loss curves not fitted
-        #                y = component["losses"]["loss_curve"].loc[key] / 10.0**3
-        #                # Plotting the unfitted fractiles
-        #                plt.plot(edp_range, y, color=self.color_grid[cnt], label=key, alpha=0.5, marker='o', markersize=3)
-        #                # Plotting the fitted fractiles
-        #                plt.plot(edp_range, y_fit, color=self.color_grid[cnt], label=key)
-        #                cnt +=2
-        #
-        #            # Sampled story losses at each simulation
-        #            total_loss_storey = component["total_loss_storey"]
-        #            # Generate a selection of random indices for plotting
-        #            selection = np.random.randint(len(total_loss_storey), size=n_to_plot)
-        #            loss_to_display = {}
-        #            for sel in selection:
-        #                loss_to_display[sel] = total_loss_storey[sel]
-        #
-        #            # Plotting the scatter points of the simulations/sampled story losses
-        #            for key in loss_to_display.keys():
-        #                y_scatter = loss_to_display[key] / 10.0**3
-        #                plt.scatter(edp_range, y_scatter, edgecolors=self.color_grid[2], marker='o', s=3,
-        #                            facecolors='none', alpha=0.5)
-        #            # Assigning a label
-        #            plt.scatter(edp_range, y_scatter, edgecolors=self.color_grid[2], marker='o', s=3,
-        #                        facecolors='none', alpha=0.5, label="Simulations")
-        #
-        #            # Assignign labels and limits for axes
-        #            if edp in ["IDR", "IDR NS", "IDR S"]:
-        #                xlabel = edp[0:3] + " [%]"
-        #                xlim = [0, 6.]
-        #                ylim = [0, 400.]
-        #            else:
-        #                xlabel = edp[0:3] + " [g]"
-        #                xlim = [0, 4.]
-        #                ylim = [0, 400.]
-        #
-        #            plt.xlabel(xlabel)
-        #            plt.ylabel(r"Losses [$10^3 €/100 m^2$]")
-        #            plt.xlim(xlim)
-        #            plt.ylim(ylim)
-        #            plt.grid(True, which="major", axis="both", ls="--", lw=1.0)
-        #            ax.legend(frameon=False, loc='center left', fontsize=10, bbox_to_anchor=(1, 0.5))
-        #            # Showing the plot
-        #            if not showplot:
-        #                plt.close()
-        #            # Storing the plots as .emf and .png
-        #            if sflag:
-        #                self.plot_as_emf(fig,filename=self.directory/"client"/'figures'/f'loss_{edp}_'
-        #                                                                                f'{plot_tag}'.replace(" ", "_"))
-        #                self.plot_as_png(fig,filename=self.directory/"client"/'figures'/f'loss_{edp}_'
-        #                                                                                f'{plot_tag}'.replace(" ", "_"))
-        #
-        # %% Shared plot
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4), sharey=True, dpi=100,
-                                            gridspec_kw={'hspace': 0.1, 'wspace': 0.1})
-        axes = [ax1, ax2, ax3]
-        id_axis = 0
-        if edp == "IDR" or edp == "IDR NS" or edp == "IDR S":
-            idr_range = idr_range * 100
-
-        for edp in edps:
-            component = data[edp]
-            if edp == "IDR" or edp == "IDR NS" or edp == "IDR S":
-                edp_range = idr_range
             else:
-                edp_range = pfa_range
+                raise ValueError("[EXCEPTION] Wrong SLF file format provided! Should be .csv or .pickle")
 
-            ax = axes[id_axis]
-            cnt = 0
-            for key in component["edp_dv_euro"].keys():
-                if key == "mean":
-                    lbl = "Mean"
-                else:
-                    lbl = f"{int(key * 100)}%"
+    def slfs_csv(self):
+        """
+        SLFs are read and ELRs per performance group are derived
+        SLFs for both PFA- and PSD-sensitive components are lumped at storey level, and not at each floor
+        :return: ndarray                            Losses (PSD_S, PSD_NS, PFA_NS), EDP names, EDP ranges
+        """
+        los, edp_cols, edps_array = None, None, None
+        
+        for file in os.listdir(self.path):
+            if not os.path.isdir(self.path / file):
+                # Read the file (needs to be single file)
+                filename = self.path / file
+                try:
+                    df = pd.read_excel(io=filename)
+                except:
+                    df = pd.read_csv(filename)
 
-                # Fractile loss curves, Fitted loss in Currency
-                y_fit = component["edp_dv_euro"][key] / 10.0 ** 3
-                # Fractile loss curves not fitted
-                y = component["losses"]["loss_curve"].loc[key] / 10.0 ** 3
-                # Plotting the unfitted fractiles
-                ax.plot(edp_range, y, color=self.color_grid[cnt], label=lbl, alpha=0.5, marker='o', markersize=5)
-                # Plotting the fitted fractiles
-                ax.plot(edp_range, y_fit, color=self.color_grid[cnt], label=lbl)
-                cnt += 2
+                # Get the feature names
+                columns = np.array(df.columns, dtype="str")
 
-            # Sampled story losses at each simulation
-            total_loss_storey = component["total_loss_storey"]
-            # Generate a selection of random indices for plotting
-            selection = np.random.randint(len(total_loss_storey), size=n_to_plot)
-            loss_to_display = {}
-            for sel in selection:
-                loss_to_display[sel] = total_loss_storey[sel]
+                # Subdivide SLFs into EDPs and Losses
+                testCol = np.char.startswith(columns, "E")
+                lossCol = columns[testCol]
+                edpCol = columns[np.logical_not(testCol)]
 
-            # Plotting the scatter points of the simulations/sampled story losses
-            for key in loss_to_display.keys():
-                y_scatter = loss_to_display[key] / 10.0 ** 3
-                ax.scatter(edp_range, y_scatter, edgecolors=self.color_grid[2], marker='o', s=3,
-                           facecolors='none', alpha=0.5)
-            # Assigning a label
-            ax.scatter(edp_range, y_scatter, edgecolors=self.color_grid[2], marker='o', s=3,
-                       facecolors='none', alpha=0.5, label="Simulations")
+                edps = df[edpCol]
+                edps_array = edps.to_numpy(dtype=float)
+                loss = df[lossCol].to_numpy(dtype=float)
+                loss /= self.normalizeCost
+                
+                # EDP names
+                edp_cols = np.array(edps.columns, dtype="str")
 
-            # Assignign labels and limits for axes
-            if edp in ["IDR", "IDR NS", "IDR S"]:
-                xlabel = edp[0:3] + " [%]"
-                xlim = [0, 6.]
-                ylim = [0, 600.]
+                return loss, edp_cols, edps_array
+
+    def plot_csv(self, loss, edp_range, edps):
+        """
+        Plots SLFs provided via csv file format
+        :param loss: ndarray
+        :param edp_range: ndarray
+        :param edps: ndarray
+        :return: list of figure objects
+        """
+        figs = []
+        for i in range(len(edps)):
+            fig, ax = plt.subplots(figsize=(4, 3), dpi=200)
+            x = edp_range[:, i]
+            y = loss[:, i]
+            edp = edps[i][0:3]
+            label = f"{edps[i][0:3]}, {edps[i][4]}, {edps[i][-1]} storey"
+            if edp in ["IDR", "IDR NS", "IDR S", "PSD", "PSD NS", "PSD S"]:
+                xlabel = r"Peak Storey Drift, (PSD), $\theta$ [%]"
+                xlim = [0, max(x)]
             else:
-                xlabel = edp[0:3] + " [g]"
-                xlim = [0, 4.]
-                ylim = [0, 400.]
+                xlabel = r"Peak Floor Acceleration, (PFA), $a$ [g]"
+                xlim = [0, 4.0]
+            ylim = [0, 1.0]
 
+            ax.plot(x, y, color=self.color_grid[2], label=label)
             ax.set_xlabel(xlabel)
-            if id_axis == 0:
-                ax.set_ylabel(r"Losses [$10^3 €/100 m^2$]")
+            ax.set_ylabel(r"Loss, $L$")
             ax.set_xlim(xlim)
             ax.set_ylim(ylim)
             ax.grid(True, which="major", axis="both", ls="--", lw=1.0)
-            id_axis += 1
+            ax.legend(frameon=False, loc='upper right', fontsize=10)
+            figs.append(fig)
+        return figs
+    
+    def slfs_pickle(self):
+        """
+        SLFs are read and ELRs per performance group are derived
+        :return: dict                               SLFs and EDP ranges
+        """
+        '''
+        Inputs:
+            EAL_limit: In % or currency
+            Normalize: True or False
 
-        # Legend
-        fig.add_subplot(111, frameon=False, xticks=[], yticks=[])
-        handles, labels = ax.get_legend_handles_labels()
-        plt.legend(handles, labels, frameon=False, loc='upper center', fontsize=10,
-                   bbox_to_anchor=(0.25, 0., 0.5, -0.15), ncol=5)
+        If EAL is in %, then normalize should be set to True, normalization based on sum(max(SLFs))
+        If EAL is in currency, normalize is an option
+        If normalize is True, then normalization of SLFs will be carried out
 
-        #        fig.tight_layout()
+        It is important to note, that the choice of the parameters is entirely on the user, 
+        as the software will run successfully regardless.
+        '''
+        '''
+        Outputs files have 6 features:  slfs                Regressed storey loss functions
+                                        costs               Sampled costs at each simulation
+                                        regression          Regression function name (currently supports 2 version)
+                                        fit_pars            Regression function parameters
+                                        accuracy            Accuracy metrics (try not to overcrowd)
+                                        edp                 EDP range (x axis), supports PSD and PFA
+        '''
+        # SLF output file naming conversion is important (disaggregation is based on that)
+        # IPBSD currently supports use of 3 distinct performance groups
+        # i.e. PSD_NS, PSD_S, PFA_NS
+        # Initialize
+        SLFs = {"Directional": {"PSD_NS": {}, "PSD_S": {}},
+                "Non-directional": {"PFA_NS": {}, "PSD_NS": {}, "PSD_S": {}}}
 
-        if not showplot:
-            plt.close()
-        if sflag:
-            self.plot_as_emf(fig, filename=self.directory / "client" / 'figures' / f'loss_all_'
-                                                                                   f'{plot_tag}'.replace(" ", "_"))
+        # Initialize EDP ranges
+        pfa = None
+        psd = None
+        for file in os.listdir(self.path):
+            if not os.path.isdir(self.path / file) and not file.endswith(".csv") and not file.endswith(".xlsx"):
 
-        # Storing figures
-        #        if sflag:
-        #            if fig1 is not None:
-        #                self.plot_as_emf(fig1, filename=self.directory/"client"/'figures'/f'slf_idr_s_{plot_tag}')
-        #                self.plot_as_png(fig1, filename=self.directory/"client"/'figures'/f'slf_idr_s_{plot_tag}')
-        #            if fig2 is not None:
-        #                self.plot_as_emf(fig2, filename=self.directory/"client"/'figures'/f'slf_pfa_ns_{plot_tag}')
-        #                self.plot_as_png(fig2, filename=self.directory/"client"/'figures'/f'slf_pfa_ns_{plot_tag}')
-        #            if fig3 is not None:
-        #                self.plot_as_emf(fig3, filename=self.directory/"client"/'figures'/f'comp1_frag_{plot_tag}')
-        #                self.plot_as_png(fig3, filename=self.directory/"client"/'figures'/f'comp1_frag_{plot_tag}')
+                # Open slf file
+                f = open(self.path / file, "rb")
+                df = pickle.load(f)
+                f.close()
 
-        # %%
-        # Disaggregating by structural and non-structural contribution
-        # Consequence parameters
-        #        n1 = 5                                         # Number of structural components
-        #        means_cost = np.zeros((n1, 5))
-        #
-        #        component_data = data["IDR"]["component"].select_dtypes(exclude=["object"])
-        #        repair_cost =
-        #
-        #        # Deriving fragility functions
-        #        df = component_data.values[:, 3:]
-        #        for item in range(n1):
-        #            for ds in range(5):
-        #                means_cost[item][ds] = df[item][ds+10]
-        #
-        #        total_replacement_cost = data[edp]["total_replacement_cost"]
-        #        quantities = slf["IDR"]["component"]["Quantity"]
-        #        total_s_idr = {}                              # Total structural repair costs
-        #        repl_s_idr = {}                               # Replacement costs
-        #        for item in range(n1):
-        #            total_s_idr[item] = {}
-        #            repl_s_idr[item] = max(means_cost[item])
-        #            for n in range(3200):
-        #                total_repair_cost[item][n] = repair_cost[item][n]*quantities[item-1]
+                str_list = re.split("_+", file)
+                # Test if "2d" structure is being considered only
+                if self.geometry == 0:
+                    if str_list[0][-1] == "1" or len(str_list) == 2:
+                        # Perform the loop if dir1 or non-directional components
+                        pass
+                    else:
+                        # Skip the loop
+                        continue
 
-        return data
+                if len(str_list) == 2:
+                    direction = None
+                    non_dir = "Non-directional"
+                else:
+                    direction = str_list[0][-1]
+                    non_dir = "Directional"
+                edp = str_list[-1][0:3]
+
+                if edp == "pfa":
+                    story = str_list[0][-1]
+                    for key in df.keys():
+                        if not key.startswith("SLF"):
+                            loss = df[key]["slfs"]["mean"]
+                            SLFs[non_dir]["PFA_NS"][str(int(story) - 1)] = {"loss": loss,
+                                                                            "edp": df[key]["fragilities"]["EDP"]}
+                            try:
+                                pfa = df[key]["fragilities"]["EDP"]
+                            except:
+                                pfa = df[key]["edp"]
+
+                else:
+                    story = str_list[-2][-1]
+                    for key in df.keys():
+                        if not key.startswith("SLF"):
+                            if key == str(self.S_KEY):
+                                # if key == str(s_key):
+                                tag = "PSD_S"
+                            elif key == str(self.NS_KEY):
+                                tag = "PSD_NS"
+                            else:
+                                raise ValueError("[EXCEPTION] Wrong group name provided!")
+
+                            if direction is not None:
+                                if "dir" + direction not in SLFs[non_dir][tag].keys():
+                                    SLFs[non_dir][tag]["dir" + direction] = {}
+                                loss = df[key]["slfs"]["mean"]
+                                SLFs[non_dir][tag]["dir" + direction].update({story: {"loss": loss,
+                                                                                      "edp": df[key]["fragilities"][
+                                                                                          "EDP"]}})
+
+                            else:
+                                loss = df[key]["slfs"]["mean"]
+                                SLFs[non_dir][tag].update({story: {"loss": loss,
+                                                                   "edp": df[key]["fragilities"]["EDP"]}})
+
+                            try:
+                                psd = df[key]["fragilities"]["EDP"]
+                            except:
+                                psd = df[key]["edp"]
+
+        # SLFs should be exported for use in LOSS
+        # SLFs are disaggregated based on story, direction and EDP-sensitivity
+        # Next, the SLFs are lumped at each storey based on EDP-sensitivity
+        # EDP range should be the same for each corresponding group
+        # Create SLF functions based on number of stories
+        slf_functions = {}
+        edps = {"PFA": pfa, "PSD": psd}
+        for group in self.PERF_GROUP:
+            slf_functions[group] = {}
+            # Add for zero floor for PFA sensitive group
+            if group == "PFA_NS":
+                slf_functions[group]["0"] = np.zeros(pfa.shape)
+            for st in range(1, self.nst + 1):
+                if group == "PFA_NS":
+                    edp = pfa
+                else:
+                    edp = psd
+                slf_functions[group][str(st)] = np.zeros(edp.shape)
+
+        # Generating the SLFs for each Performance Group of interest at each storey level
+        for i in SLFs:
+            for j in SLFs[i]:
+                if i == "Directional":
+                    for k in SLFs[i][j]:
+                        for st in SLFs[i][j][k]:
+                            loss = SLFs[i][j][k][st]["loss"]
+                            slf_functions[j][st] += loss / self.normalizeCost
+                else:
+                    for st in SLFs[i][j]:
+                        loss = SLFs[i][j][st]["loss"]
+                        slf_functions[j][st] += loss / self.normalizeCost
+
+        return slf_functions, edps
+    
+    def plot_pickle(self, loss, edps):
+
+        # Initialize list of figures
+        figs = []
+        names = []
+        # For each performance group
+        for group in loss:
+            # Get the edp range
+            if group[0:3] == "PFA":
+                edp = edps["PFA"]
+                storeyLabel = "floor"
+            else:
+                edp = edps["PSD"]
+                storeyLabel = "storey"
+
+            # At each storey/floor level
+            for st in loss[group]:
+                # Names
+                names.append(f"{group}_{st}")
+                # Factor to reduce the y axis values to more readible values
+                factor = 10**3 if self.normalizeCost == 1 else 1.0
+                # Losses
+                y = loss[group][st] / factor
+                # Start figure generation
+                fig, ax = plt.subplots(figsize=(4, 3), dpi=200)
+
+                label = f"{group[0:3]}, {group[4:]}, {st} {storeyLabel}"
+                if group[0:3] in ["IDR", "IDR NS", "IDR S", "PSD", "PSD NS", "PSD S"]:
+                    xlabel = r"Peak Storey Drift, (PSD), $\theta$"
+                    xlim = [0, 0.05]
+                else:
+                    xlabel = r"Peak Floor Acceleration, (PFA), $a$ [g]"
+                    xlim = [0, 4.0]
+                ylim = [0, max(y) + 50.]
+
+                ax.plot(edp, y, color=self.color_grid[2], label=label)
+                ax.set_xlabel(xlabel)
+                if factor != 1.0:
+                    addLabel = r", $x10^3$"
+                else:
+                    addLabel = ""
+                ax.set_ylabel(r"Loss, $L$" + addLabel)
+                ax.set_xlim(xlim)
+                ax.set_ylim(ylim)
+                ax.grid(True, which="major", axis="both", ls="--", lw=1.0)
+                ax.legend(frameon=False, loc='upper right', fontsize=10)
+                figs.append(fig)
+
+        return figs, names
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    path = Path.cwd().parents[1] / ".applications/case1/Output/slfoutput"
+    slf = SLF(path, 5)
+    loss = slf.read_slfs()
+
