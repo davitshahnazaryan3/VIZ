@@ -48,3 +48,7 @@ if __name__ == "__main__":
     # nst = 5
     # seismic.slfs(path, nst=nst)
 
+    # SPO plotting
+    path = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/SPO.pickle"
+    seismic.spo(path)
+    

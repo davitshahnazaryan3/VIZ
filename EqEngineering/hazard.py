@@ -23,7 +23,7 @@ class Hazard:
         periodIndex = int(self.period * 10)
 
         # Generate figure 1
-        fig1, ax1 = plt.subplots(figsize=(4, 3), dpi=200)
+        fig, ax = plt.subplots(figsize=(4, 3), dpi=200)
         for i in range(len(data[0])):
             if i == 0:
                 labelgray = "Hazard"
@@ -47,7 +47,7 @@ class Hazard:
         periodRange[periodRange == ""] = 0.0
         periodRange = np.array(periodRange, dtype=float)
 
-        return fig1
+        return fig
 
     def fitted_hazard(self, data):
         """

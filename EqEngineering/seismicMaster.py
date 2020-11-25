@@ -1,6 +1,7 @@
 from EqEngineering.hazard import Hazard
 from EqEngineering.slf import SLF
-from EqEngineering.spo import Spo
+from EqEngineering.ipbsd import IPBSD
+from EqEngineering.spo import SPO
 from EqEngineering.ida import Ida
 from EqEngineering.loss import Loss
 import pickle
@@ -49,14 +50,14 @@ class SeismicMaster:
         if true:
             with open(path, "rb") as f:
                 h = pickle.load(f)
-                fig = hazard.true_hazard(h)
-                self.exportFigure(fig, "trueHazard")
+            fig = hazard.true_hazard(h)
+            self.exportFigure(fig, "trueHazard")
 
         if fitted:
             with open(pathFitted, "rb") as f:
                 h = pickle.load(f)
-                fig = hazard.fitted_hazard(h)
-                self.exportFigure(fig, "fittedHazard")
+            fig = hazard.fitted_hazard(h)
+            self.exportFigure(fig, "fittedHazard")
 
         if self.export or self.exportMiser:
             print("[SUCCESS] Hazard functions have been exported!")
@@ -72,6 +73,7 @@ class SeismicMaster:
         :param geometry: int
         :param normalizeCost: float
         :param pflag: bool
+        :return: None
         """
         slf = SLF(path, nst, n_to_plot, geometry, normalizeCost)
         if pflag:
@@ -83,3 +85,22 @@ class SeismicMaster:
             print("[SUCCESS] Storey loss functions have been exported!")
         else:
             print("[SUCCESS] Storey loss functions have been plotted!")
+
+    def spo(self, path, pflag=True):
+        """
+        Plots SPO
+        :param path: str
+        :param pflag: bool
+        :return: None
+        """
+        spo = SPO()
+        if pflag:
+            with open(path, "rb") as f:
+                data = pickle.load(f)
+            fig = spo.base_shear_vs_top_displacement(data)
+            self.exportFigure(fig, "fittedHazard")
+
+        if self.export or self.exportMiser:
+            print("[SUCCESS] SPO figure has been exported!")
+        else:
+            print("[SUCCESS] SPO figure has been plotted!")
