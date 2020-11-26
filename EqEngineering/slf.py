@@ -4,6 +4,7 @@ import pickle
 import re
 import pandas as pd
 import numpy as np
+import random
 
 
 class SLF:
@@ -307,6 +308,122 @@ class SLF:
                 ax.grid(True, which="major", axis="both", ls="--", lw=1.0)
                 ax.legend(frameon=False, loc='upper right', fontsize=10)
                 figs.append(fig)
+
+        return figs, names
+
+    def slfs_detailed(self):
+        """
+        Detailed SLF plots
+        :return: figure objects
+        """
+        '''
+        Outputs files have 6 features:  slfs                Regressed storey loss functions
+                                        costs               Sampled costs at each simulation
+                                        regression          Regression function name (currently supports 2 version)
+                                        fit_pars            Regression function parameters
+                                        accuracy            Accuracy metrics (try not to overcrowd)
+                                        edp                 EDP range (x axis), supports PSD and PFA
+                                        edp_type            EDP type name
+        '''
+        figs = []
+        names = []
+        for file in os.listdir(self.path):
+            if not os.path.isdir(self.path / file) and not file.endswith(".csv") and not file.endswith(".xlsx"):
+                print(file)
+                # Open slf file
+                f = open(self.path / file, "rb")
+                data = pickle.load(f)
+                f.close()
+
+                # EDP range
+                edp_range = data["edp"]
+
+                # Create labels for the type of regression function selected
+                fit_pars = data["fit_pars"]["mean"]["popt"]
+
+                # Regression function used
+                regression = data["regression"]
+                if regression == "Weibull":
+                    regressionLabel = r"$L=\alpha\left[1-exp\left(-\left(\frac{EDP}{\beta}\right)^\gamma\right)\right]$"
+                    fitParLabel = r"$\alpha=%.2f, \beta=%.2f, \gamma=%.2f$" \
+                                  % (fit_pars[0], fit_pars[1], fit_pars[2])
+                    errorLabel = r"$error_{max}=%.0f$" % (data["accuracy"][0]) + "%, "
+                    errorCum = r"$error_{cum}=%.0f$" % (data["accuracy"][1]) + "%"
+                    regressionLabel = regressionLabel + "\n" + fitParLabel + "\n" + errorLabel + errorCum
+
+                elif regression == "Papadopoulos":
+                    regressionLabel = r"$L=\left[\epsilon\frac{EDP^\alpha}{\beta^\alpha + x^\alpha} + " \
+                                      r"(1-\epsilon)\frac{x^\gamma}{\delta^\gamma + x^\gamma}\right]$"
+                    fitParLabel = r"$\alpha=%.2f, \beta=%.2f, \gamma=%.2f, \delta=%.2f, \epsilon=%.2f$" \
+                                  % (fit_pars[0], fit_pars[1], fit_pars[2], fit_pars[3], fit_pars[4])
+                    errorLabel = r"$error_{max}=%.0f$" % (data["accuracy"][0]) + "%, "
+                    errorCum = r"$error_{cum}=%.0f$" % (data["accuracy"][1]) + "%"
+                    regressionLabel = regressionLabel + "\n" + fitParLabel + "\n" + errorLabel + errorCum
+
+                else:
+                    # There is no other fitting function really implemented within SLF Generator
+                    # (so I will not even print out an error)
+                    regressionLabel = None
+
+                # Factor to reduce the y axis values to more readible values
+                factor = 10**3 if self.normalizeCost == 1 else 1.0
+
+                fig, ax = plt.subplots(figsize=(4, 3), dpi=200)
+                cnt = 0
+                for key in data["slfs"].keys():
+                    y_fit = data["slfs"][key] / 10.0 ** 3
+                    if key == "mean":
+                        label = key
+                    else:
+                        label = f"{int(key * 100)}"
+                    ax.plot(edp_range, y_fit, color=self.color_grid[cnt], label=label)
+                    cnt += 2
+
+                # Plotting the scatters of the Monte Carlo simulations
+                costs = data["costs"]
+                # Generate a selection of random indices for plotting
+                if len(costs) > self.n_to_plot:
+                    selection = random.sample(range(len(costs)), self.n_to_plot)
+                    loss_to_display = {}
+                    for sel in selection:
+                        loss_to_display[sel] = costs[sel]
+                else:
+                    loss_to_display = {}
+                    for sel in costs.keys():
+                        loss_to_display[sel] = costs[sel]
+
+                for key in loss_to_display.keys():
+                    y_scatter = loss_to_display[key] / factor
+                    ax.scatter(edp_range, y_scatter, edgecolors=self.color_grid[2], marker='o', s=3, facecolors='none',
+                               alpha=0.5)
+                ax.scatter(edp_range, y_scatter, edgecolors=self.color_grid[2], marker='o', s=3, facecolors='none',
+                           alpha=0.5, label="Simulations")
+
+                # Labeling
+                edp_type = data["edp_type"]
+                if edp_type in ["IDR", "IDR NS", "IDR S", "PSD", "PSD NS", "PSD S"]:
+                    xlabel = r"Peak Storey Drift (PSD), $\theta$ [%]"
+                    xlim = [0, 5.0]
+                else:
+                    xlabel = r"Peak Floor Acceleration (PFA), $a$ [g]"
+                    xlim = [0, 4.0]
+                ylim = [0, max(y_fit) + 50.0]
+
+                # Annotating
+                fig.text(0.78, 0.3, regressionLabel, horizontalalignment='right', verticalalignment="top")
+
+                # Labeling
+                ax.set_xlabel(xlabel)
+                ax.set_ylabel(r"Loss, $L$")
+                ax.set_xlim(xlim)
+                ax.set_ylim(ylim)
+                ax.grid(True, which="major", axis="both", ls="--", lw=1.0)
+                ax.legend(frameon=False, loc='center left', fontsize=10, bbox_to_anchor=(1, 0.5))
+
+                # Append into figures
+                figs.append(fig)
+                # Save name for the figure
+                names.append(file.split(".")[0])
 
         return figs, names
 

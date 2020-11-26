@@ -6,6 +6,7 @@ from EqEngineering.ida import Ida
 from EqEngineering.loss import Loss
 import pickle
 from plotter import Plotter
+import pandas as pd
 
 
 class SeismicMaster:
@@ -35,7 +36,7 @@ class SeismicMaster:
         if self.exportMiser:
             self.plotter.plot_as_png(fig, filename=self.exportDir / name)
 
-    def hazard(self, path, true=True, pathFitted=None, fitted=False, period=None):
+    def hazard(self, path, true=True, pathFitted=None, fitted=False, period=None, rp=None):
         """
         Calls a Hazard object
         :param path: str                    Path to file
@@ -43,10 +44,11 @@ class SeismicMaster:
         :param pathFitted: str              Path to fitted function
         :param fitted: bool                 Plot 2-nd order fitted function
         :param period: float                Period of interest to highlight
+        :param rp: list(float)              Return periods to highlight on the graphs
         :return: None
         """
         # Call the Hazard object
-        hazard = Hazard(period)
+        hazard = Hazard(period, rp=rp)
         if true:
             with open(path, "rb") as f:
                 h = pickle.load(f)
@@ -64,7 +66,7 @@ class SeismicMaster:
         else:
             print("[SUCCESS] Hazard functions have been plotted!")
 
-    def slfs(self, path, nst, n_to_plot=100, geometry=0, normalizeCost=1, pflag=True):
+    def slfs(self, path, nst, n_to_plot=100, geometry=0, normalizeCost=1, pflag=True, detailedSLF=False):
         """
         Plots graphs separately for each storey and Performance group (i.e. 3 groups x n storeys)
         :param path: str                    Directory of SLF output files
@@ -73,13 +75,19 @@ class SeismicMaster:
         :param geometry: int
         :param normalizeCost: float
         :param pflag: bool
+        :param detailedSLF: bool
         :return: None
         """
         slf = SLF(path, nst, n_to_plot, geometry, normalizeCost)
         if pflag:
-            figs, edp_cols = slf.read_slfs()
+
+            if detailedSLF:
+                figs, names = slf.slfs_detailed()
+            else:
+                figs, names = slf.read_slfs()
+
             for i in range(len(figs)):
-                self.exportFigure(figs[i], edp_cols[i])
+                self.exportFigure(figs[i], names[i])
 
         if self.export or self.exportMiser:
             print("[SUCCESS] Storey loss functions have been exported!")
@@ -104,3 +112,78 @@ class SeismicMaster:
             print("[SUCCESS] SPO figure has been exported!")
         else:
             print("[SUCCESS] SPO figure has been plotted!")
+
+    def ipbsd(self, lossCurvePath=None, spectrumPath=None, solutionPath=None, spo2idaPath=None, spoModelPath=None):
+        """
+        IPBSD plotting
+        :param lossCurvePath: str                   Loss curve path
+        :param spectrumPath: str                    Spectrum path
+        :param solutionPath: str
+        :param spo2idaPath: str
+        :param spoModelPath: str
+        :return:
+        """
+        ipbsd = IPBSD()
+        # Loss curve plotter
+        if lossCurvePath is not None:
+            with open(lossCurvePath, "rb") as f:
+                data = pickle.load(f)
+            fig = ipbsd.lossCurve(data)
+            self.exportFigure(fig, "LossCurve")
+
+        # Spectrum plotter
+        if spectrumPath is not None:
+            spectrum = pd.read_csv(spectrumPath)
+            fig = ipbsd.spectrum(spectrum, x="Sd", y="Sa")
+            self.exportFigure(fig, "spectrum")
+
+            # Design solution space plotter
+            if solutionPath is not None:
+                with open(solutionPath, "rb") as f:
+                    sol = pickle.load(f)
+                fig = ipbsd.solutionSpace(sol, spectrum)
+                self.exportFigure(fig, "solution_space")
+
+        # SPO2IDA results plotter
+        if spo2idaPath is not None:
+            with open(spo2idaPath, "rb") as f:
+                spo2ida = pickle.load(f)
+            fig = ipbsd.spo2ida(spo2ida)
+            self.exportFigure(fig, "spo2ida")
+
+        # SPO shape from a nonlinear model and its idealized shape
+        if spoModelPath is not None:
+            with open(spoModelPath, "rb") as f:
+                spo = pickle.load(f)
+            fig = ipbsd.spo(spo)
+            self.exportFigure(fig, "spo")
+
+        # --------------------------------------------------------------------
+        # -----------------    Printing stuff --------------------------------
+        if lossCurvePath is not None:
+            if self.export or self.exportMiser:
+                print("[SUCCESS] Loss Curve figure has been exported!")
+            else:
+                print("[SUCCESS] Loss Curve figure has been plotted!")
+        if spectrumPath is not None:
+            if self.export or self.exportMiser:
+                print("[SUCCESS] Spectrum figure has been exported!")
+            else:
+                print("[SUCCESS] Spectrum figure has been plotted!")
+            if solutionPath is not None:
+                if self.export or self.exportMiser:
+                    print("[SUCCESS] Design solution space figure has been exported!")
+                else:
+                    print("[SUCCESS] Design solution space figure has been plotted!")
+
+        if spo2idaPath is not None:
+            if self.export or self.exportMiser:
+                print("[SUCCESS] SPO2IDA figure has been exported!")
+            else:
+                print("[SUCCESS] SPO2IDA figure has been plotted!")
+
+        if spoModelPath is not None:
+            if self.export or self.exportMiser:
+                print("[SUCCESS] Model SPO figure has been exported!")
+            else:
+                print("[SUCCESS] Model SPO figure has been plotted!")

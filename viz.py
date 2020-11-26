@@ -40,15 +40,26 @@ if __name__ == "__main__":
 
     # # Hazard plotting
     # pathHazard = Path.cwd().parents[0] / ".applications/case1/Hazard-LAquila-Soil-C.pkl"
-    # period = 1.05
-    # seismic.hazard(pathHazard, period=period)
+    # period = [1.05, 0.]
+    # rp = [475, 10000]
+    # seismic.hazard(pathHazard, period=period, rp=rp)
 
     # # SLF plotting
     # path = Path.cwd().parents[0] / ".applications/case1/Output/slfoutput"
     # nst = 5
-    # seismic.slfs(path, nst=nst)
+    # seismic.slfs(path, nst=nst, detailedSLF=True)
 
-    # SPO plotting
-    path = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/SPO.pickle"
-    seismic.spo(path)
+    # # SPO plotting
+    # path = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/SPO.pickle"
+    # seismic.spo(path)
     
+    # # IPBSD plotting
+    # lossCurvePath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/lossCurve.pickle"
+    # spectrumPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/sls_spectrum.csv"
+    # solutionPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/ipbsd.pickle"
+    # spo2idaPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/spoAnalysisCurveShape.pickle"
+    # spoModelPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/modelOutputs.pickle"
+    #
+    # seismic.ipbsd(lossCurvePath=None, spectrumPath=None, solutionPath=None, spo2idaPath=None,
+    #               spoModelPath=None)
+

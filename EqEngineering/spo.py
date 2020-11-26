@@ -22,7 +22,7 @@ class SPO:
         plt.xlim(0, max(data[0]))
         plt.ylim(0, max(data[1])+50)
         plt.xlabel('Top displacement [m]')
-        plt.ylabel("Base Shear [kN")
+        plt.ylabel("Base Shear [kN]")
         plt.grid(True, which="major", axis='both', ls="--", lw=1.0)
         plt.grid(True, which="minor", axis='both', ls="--", lw=0.5)
 
