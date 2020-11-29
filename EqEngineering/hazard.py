@@ -30,7 +30,7 @@ class Hazard:
         :return: figure object
         """
 
-        # Generate figure 1
+        # Generate figure
         fig, ax = plt.subplots(figsize=(5, 3), dpi=200)
         if plotall:
             for i in range(len(data[0])):
@@ -43,13 +43,13 @@ class Hazard:
         for i in range(len(self.period)):
             periodIndex = int(self.period[i] * 10)
             labelAdd = f"T={self.period[i]}s" if self.period[i] > 0.0 else "PGA"
-            plt.loglog(data[1][periodIndex], data[2][periodIndex], color=self.color_grid[i])
-            plt.scatter(data[1][periodIndex], data[2][periodIndex], color=self.color_grid[i],
-                        label=f"PSHA, {labelAdd}", marker=self.markers[i])
+            plt.loglog(data[1][periodIndex], data[2][periodIndex], color=self.color_grid[i],
+                       label=f"PSHA, {labelAdd}", marker=self.markers[i])
 
-        for i in self.rp:
-            plt.plot([0.01, 10.1], [1/i, 1/i], ls='--', color=self.gray)
-            self.add_text(ax, 0.011, 1.5/i, f'Return period: {i} years', color=self.gray, ha='left')
+        if not self.rp:
+            for i in self.rp:
+                plt.plot([0.01, 10.1], [1/i, 1/i], ls='--', color=self.gray)
+                self.add_text(ax, 0.011, 1.5/i, f'Return period: {i} years', color=self.gray, ha='left')
         plt.ylim(10e-6, 1)
         plt.xlim(0.01, 10.1)
         plt.xticks(np.array([0.01, 0.1, 1.0, 10]))
@@ -58,7 +58,7 @@ class Hazard:
         plt.rc('xtick', labelsize=self.FONTSIZE)
         plt.rc('ytick', labelsize=self.FONTSIZE)
         plt.grid(True, which="major", ls="--", lw=0.8, dashes=(5, 10))
-        plt.legend(frameon=False, loc='upper right', fontsize=self.FONTSIZE, bbox_to_anchor=(1.4, 1))
+        plt.legend(frameon=False, loc='upper right', fontsize=self.FONTSIZE, bbox_to_anchor=(1.5, 1))
 
         # Period range
         periodRange = [x.strip("PGA, SA()") for x in data[0]]

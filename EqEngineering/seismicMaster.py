@@ -2,7 +2,7 @@ from EqEngineering.hazard import Hazard
 from EqEngineering.slf import SLF
 from EqEngineering.ipbsd import IPBSD
 from EqEngineering.spo import SPO
-from EqEngineering.ida import Ida
+from EqEngineering.ida import IDA
 from EqEngineering.loss import Loss
 import pickle
 from plotter import Plotter
@@ -106,7 +106,7 @@ class SeismicMaster:
             with open(path, "rb") as f:
                 data = pickle.load(f)
             fig = spo.base_shear_vs_top_displacement(data)
-            self.exportFigure(fig, "fittedHazard")
+            self.exportFigure(fig, "rcmrf_spo")
 
         if self.export or self.exportMiser:
             print("[SUCCESS] SPO figure has been exported!")
@@ -121,6 +121,7 @@ class SeismicMaster:
         :param solutionPath: str
         :param spo2idaPath: str
         :param spoModelPath: str
+        :param ida_rcmrfPath: str
         :return:
         """
         ipbsd = IPBSD()
@@ -187,3 +188,17 @@ class SeismicMaster:
                 print("[SUCCESS] Model SPO figure has been exported!")
             else:
                 print("[SUCCESS] Model SPO figure has been plotted!")
+
+    def rcmrf(self, ida_rcmrfPath=None):
+        """
+        Plotting RCMRF results
+        :param ida_rcmrfPath: str
+        :return:
+        """
+        ida = IDA()
+        # RCMRF IDA plotter
+        if ida_rcmrfPath is not None:
+            with open(ida_rcmrfPath, "rb") as f:
+                fits = pickle.load(f)
+            fig = ida.disp_vs_im(fits)
+            self.exportFigure(fig, "ida_rcmrf_disp_im")

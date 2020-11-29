@@ -41,18 +41,18 @@ if __name__ == "__main__":
     # # Hazard plotting
     # pathHazard = Path.cwd().parents[0] / ".applications/case1/Hazard-LAquila-Soil-C.pkl"
     # period = [1.05, 0.]
-    # rp = [475, 10000]
+    # rp = []
     # seismic.hazard(pathHazard, period=period, rp=rp)
 
     # # SLF plotting
     # path = Path.cwd().parents[0] / ".applications/case1/Output/slfoutput"
     # nst = 5
-    # seismic.slfs(path, nst=nst, detailedSLF=True)
-
+    # seismic.slfs(path, nst=nst, detailedSLF=False)
+    #
     # # SPO plotting
     # path = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/SPO.pickle"
     # seismic.spo(path)
-    
+    #
     # # IPBSD plotting
     # lossCurvePath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/lossCurve.pickle"
     # spectrumPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/sls_spectrum.csv"
@@ -60,6 +60,9 @@ if __name__ == "__main__":
     # spo2idaPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/spoAnalysisCurveShape.pickle"
     # spoModelPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/modelOutputs.pickle"
     #
-    # seismic.ipbsd(lossCurvePath=None, spectrumPath=None, solutionPath=None, spo2idaPath=None,
-    #               spoModelPath=None)
+    # seismic.ipbsd(lossCurvePath=lossCurvePath, spectrumPath=spectrumPath, solutionPath=solutionPath,
+    #               spo2idaPath=spo2idaPath, spoModelPath=spoModelPath)
 
+    # RCMRF IDA plotting
+    ida_rcmrfPath = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/ida_cache.pickle"
+    seismic.rcmrf(ida_rcmrfPath=ida_rcmrfPath)

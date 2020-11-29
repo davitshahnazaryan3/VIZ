@@ -24,7 +24,7 @@ Requires inkscape: for vectorized high quality image exports
 
 ### Postprocessor
 
-1. [ ] IDA results
+1. [x] IDA results
 
 ### Figures
 
