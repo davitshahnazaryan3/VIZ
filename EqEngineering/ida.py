@@ -16,18 +16,73 @@ class IDA:
         self.markers = ["o", "v", "^", "<", ">", "s", "*", "D", "+", "X", "p"]
 
     def disp_vs_im(self, data):
-
-        disp = data["mtdisp"]
-        im = data["im_qtile"]
+        """
+        IDA plotter, displacement versus Intensity Measure
+        :param data: pickle
+        :return: figure object
+        """
+        disp_range = data["mtdisp"]
+        im_qtile = data["im_qtile"]
+        im = data["im"]
+        im_spl = data["im_spl"]
+        mtdisp = data["disp"]
 
         fig, ax = plt.subplots(figsize=(5, 3), dpi=200)
-        plt.plot(disp, im[2], color=self.grayscale[8], label="84th quantile", ls="-.")
-        plt.plot(disp, im[1], color=self.grayscale[4], label="50th quantile", ls="--")
-        plt.plot(disp, im[0], color=self.grayscale[0], label="16th quantile", ls="-")
-        plt.xlim(0.0, max(disp))
-        plt.ylim(0.0, max(im[2]) + 0.5)
+        plt.plot(disp_range, im_qtile[2], color=self.color_grid[8], label="84th quantile", ls="-.")
+        plt.plot(disp_range, im_qtile[1], color=self.color_grid[6], label="50th quantile", ls="--")
+        plt.plot(disp_range, im_qtile[0], color=self.color_grid[3], label="16th quantile", ls="-")
+        # for rec in range(im_spl.shape[0]):
+        #     plt.plot(mtdisp[rec], im[rec], self.grayscale[-1], marker='o')
+        #     plt.plot(disp_range, im_spl[rec], self.grayscale[-1])
+        plt.xlim(0.0, max(disp_range))
+        plt.ylim(0.0, max(im_qtile[2]) + 0.5)
         plt.xlabel("Top displacement, [m]", fontsize=self.FONTSIZE)
         plt.ylabel("Sa, [g]", fontsize=self.FONTSIZE)
+        plt.rc('xtick', labelsize=self.FONTSIZE)
+        plt.rc('ytick', labelsize=self.FONTSIZE)
+        plt.grid(True, which="major", ls="--", lw=0.8, dashes=(5, 10))
+        plt.legend(frameon=False, loc='upper right', fontsize=self.FONTSIZE, bbox_to_anchor=(1.5, 1))
+
+        return fig
+
+    def spo2ida_model(self, ida, spo, ipbsd, spo2ida):
+        """
+        Comparative plot of SPO2IDA outputs and IDA outputs of the model
+        :param ida: pickle
+        :param spo: tuple
+        :param ipbsd: pickle
+        :param spo2ida: pickle
+        :return: figure object
+        """
+        # Model outputs
+        disp_range = ida["mtdisp"]
+        im_qtile = ida["im_qtile"]
+        # Yield Sa (SDOF)
+        cy = ipbsd["yield"][0]
+        # Yield displacement
+        dy = ipbsd["yield"][1]*ipbsd["part_factor"]
+        # Yield base shear
+        Vy = cy*9.81*ipbsd["Mstar"]*ipbsd["part_factor"]
+
+        # Plotting
+        fig, ax = plt.subplots(figsize=(5, 3), dpi=200)
+        # Model IDA quantiles
+        plt.plot(disp_range / dy, im_qtile[2] / cy / ipbsd["part_factor"], color='b', label="84th", ls="-")
+        plt.plot(disp_range / dy, im_qtile[1] / cy / ipbsd["part_factor"], color='r', label="50th", ls="-")
+        plt.plot(disp_range / dy, im_qtile[0] / cy / ipbsd["part_factor"], color='g', label="16th", ls="-")
+        # Model Pushover curve
+        plt.plot(spo[0] / dy, spo[1] / Vy, color=self.grayscale[2], label="SPO", ls="-")
+        # SPO2IDA plotting
+        plt.plot(spo2ida["spom"], spo2ida["spor"], color=self.grayscale[2], ls="--", label="SPO, design")
+        plt.plot(spo2ida["idacm"][0], spo2ida["idacr"][0], color="b", label="84th, design", ls="--")
+        plt.plot(spo2ida["idacm"][1], spo2ida["idacr"][1], color="r", label="50th, design", ls="--")
+        plt.plot(spo2ida["idacm"][2], spo2ida["idacr"][2], color="g", label="16th, design", ls="--")
+
+        # Some more manipulations
+        plt.xlim(0.0, max(spo[0] / dy))
+        plt.ylim(0.0, max(im_qtile[1] / cy) + 2)
+        plt.xlabel(r'Ductility, $\mu$', fontsize=self.FONTSIZE)
+        plt.ylabel(r'$R$', fontsize=self.FONTSIZE)
         plt.rc('xtick', labelsize=self.FONTSIZE)
         plt.rc('ytick', labelsize=self.FONTSIZE)
         plt.grid(True, which="major", ls="--", lw=0.8, dashes=(5, 10))

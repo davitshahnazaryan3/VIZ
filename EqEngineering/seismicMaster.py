@@ -189,10 +189,13 @@ class SeismicMaster:
             else:
                 print("[SUCCESS] Model SPO figure has been plotted!")
 
-    def rcmrf(self, ida_rcmrfPath=None):
+    def rcmrf(self, ida_rcmrfPath=None, spoModelPath=None, ipbsdPath=None, spo2idaPath=None):
         """
         Plotting RCMRF results
         :param ida_rcmrfPath: str
+        :param spoModelPath: str
+        :param ipbsdPath: str
+        :param spo2idaPath: str
         :return:
         """
         ida = IDA()
@@ -202,3 +205,14 @@ class SeismicMaster:
                 fits = pickle.load(f)
             fig = ida.disp_vs_im(fits)
             self.exportFigure(fig, "ida_rcmrf_disp_im")
+
+            # Comparing SPO2IDA and Model IDA results
+            if spoModelPath is not None:
+                with open(spoModelPath, "rb") as f:
+                    spo = pickle.load(f)
+                with open(ipbsdPath, "rb") as f:
+                    ipbsd = pickle.load(f)
+                with open(spo2idaPath, "rb") as f:
+                    spo2ida = pickle.load(f)
+                fig = ida.spo2ida_model(fits, spo, ipbsd, spo2ida)
+                self.exportFigure(fig, "ida_spo2ida")

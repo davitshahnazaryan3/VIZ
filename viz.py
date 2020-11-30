@@ -65,4 +65,7 @@ if __name__ == "__main__":
 
     # RCMRF IDA plotting
     ida_rcmrfPath = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/ida_cache.pickle"
-    seismic.rcmrf(ida_rcmrfPath=ida_rcmrfPath)
+    spoPath = Path.cwd().parents[0] / ".applications/case1/Output/RCMRF/test/SPO.pickle"
+    ipbsdPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/ipbsd.pickle"
+    spo2idaPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/spoAnalysisCurveShape.pickle"
+    seismic.rcmrf(ida_rcmrfPath=ida_rcmrfPath, spoModelPath=spoPath, ipbsdPath=ipbsdPath, spo2idaPath=spo2idaPath)

@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import math
+from scipy.stats import lognorm
 import json
 from scipy.interpolate import interp1d
 
@@ -201,22 +202,34 @@ class Postprocessor:
                 mtdisp[rec - 1, 1:] = mtdisp_us[rec - 1, :][idx[rec - 1]]
 
         # Fit the splines to the data
-        mpsd_range = np.linspace(0.01, 20, 200)
         mtdisp_range = np.linspace(0.01, 1, 200)
-        mpfa_range = np.linspace(0.01, 3, 200)
+
         # Quantile ranges to visualize for the IDAs
         qtile_range = np.array([0.16, 0.5, 0.84])
 
-        spl_mtdisp = self.splinefit_IDA(im, mtdisp, nrecs)
-        spl_mpfa = self.splinefit_IDA(im, mpfa, nrecs)
-        spl_mpsd = self.splinefit_IDA(im, mpsd, nrecs)
+        im_spl = np.zeros([nrecs, len(mtdisp_range)])
+        im_spl[:] = np.nan
 
-        im_spl, im_qtile = self.splinequery_IDA(spl_mtdisp, mtdisp_range, qtile_range, mtdisp, nrecs)
-        mpfa_spl, mpfa_qtile = self.splinequery_IDA(spl_mpfa, mpfa_range, qtile_range, mpfa, nrecs)
-        mpsd_spl, mpsd_qtile = self.splinequery_IDA(spl_mpsd, mpsd_range, qtile_range, mpsd, nrecs)
+        # Get the fitted IDA curves for each record
+        for rec in range(nrecs):
+            interpolator = interp1d(mtdisp[rec], im[rec])
+
+            for i in range(len(mtdisp_range)):
+                if mtdisp_range[i] <= max(mtdisp[rec]):
+                    im_spl[rec][i] = interpolator(mtdisp_range[i])
+                    if im_spl[rec][i] < im_spl[rec][i - 1]:
+                        im_spl[rec][i] = im_spl[rec][i - 1]
+                else:
+                    im_spl[rec][i] = im_spl[rec][i - 1]
+
+        # Get the IDA quantiles
+        im_qtile = np.zeros([len(qtile_range), len(mtdisp_range)])
+        for q in range(len(qtile_range)):
+            for i in range(len(mtdisp_range)):
+                im_qtile[q][i] = np.quantile(im_spl[:, i], qtile_range[q])
 
         # Creating a dictionary for the spline fits
-        cache = {"im_spl": im_spl, "im_qtile": im_qtile, "mtdisp": mtdisp_range}
+        cache = {"im_spl": im_spl, "disp": mtdisp, "im": im, "im_qtile": im_qtile, "mtdisp": mtdisp_range}
 
         # Exporting
         if self.export:
@@ -226,7 +239,129 @@ class Postprocessor:
         else:
             print("[SUCCESS] Postprocesssing complete.")
 
-        return res
+        return res, cache
+
+    def mafe_direct_im_based(self, eta, beta, sa_haz, Hs):
+        """
+        Details:
+        Compute the MAFE of a limit state defined via a fitted lognormal
+        distribution by integrating directly with the  hazard curve
+        Treat the hazard input to avoid errors.
+        We strip out:
+         1. the negative H values (usually at the beginning)
+         2. the points with constant s (usually at the end)
+        Information:
+        Author: Gerard J. O'Reilly
+        First Version: April 2020
+        Notes:
+        References:
+        Porter KA, Beck JL, Shaikhutdinov R V. Simplified Estimation of Economic
+        Seismic Risk for Buildings. Earthquake Spectra 2004; 20(4):
+        1239–1263. DOI: 10.1193/1.1809129.
+        Inputs:
+        :param eta: float                           Fragility function median (intensity)
+        :param beta: float                          Fragility function dispersion (total)
+        :param sa_haz: array                        List of corresponding intensities for Hs
+        :param Hs: array                            List of values of annual probability of exceedance
+        :return: float                              Mean annual frequency of exceedance
+        """
+
+        # Do first strip
+        s_f = []
+        H_f = []
+        for aa, bb in zip(sa_haz, Hs):
+            if bb > 0:
+                s_f.append(aa)
+                H_f.append(bb)
+
+        # Do second strip
+        s_ff = []
+        H_ff = []
+        for i in range(len(s_f) - 1):
+            if H_f[i] - Hs[i + 1] > 0:
+                s_ff.append(s_f[i])
+                H_ff.append(H_f[i])
+        s_ff.append(s_f[-1])
+        H_ff.append(H_f[-1])
+
+        # Overwrite the initial variable for convenience
+        s = s_ff
+        H = H_ff
+
+        # First we compute the PDF value of the fragility at each of the discrete
+        # hazard curve points
+        p = lognorm.cdf(s, beta, scale=eta)
+
+        # This function computes the MAF using Method 1 outlined in
+        # Porter et al. [2004]
+        # This assumes that the hazard curve is linear in logspace between
+        # discrete points among others
+
+        # Initialise some arrays
+        ds = []
+        ms = []
+        dHds = []
+        dp = []
+        dl = []
+
+        for i in np.arange(len(s) - 1):
+            ds.append(s[i + 1] - s[i])
+            ms.append(s[i] + ds[i] * 0.5)
+            dHds.append(np.log(H[i + 1] / H[i]) / ds[i])
+            dp.append(p[i + 1] - p[i])
+            dl.append(p[i] * H[i] * (1 - np.exp(dHds[i] * ds[i])) - dp[i] / ds[i] * H[i] * (
+                        np.exp(dHds[i] * ds[i]) * (ds[i] - 1 / dHds[i]) + 1 / dHds[i]))
+
+        # Compute the MAFE
+        l = sum(dl)
+        return l
+
+    def verify_mafc(self, res, hazardPath, targetMAFC, MApath, ipbsdPath):
+        """
+        Verifies that MAFC is below the target value
+        :param res: pickle
+        :param hazardPath: str
+        :param targetMAFC: float
+        :param MApath: str
+        :param ipbsdPath: str
+        :return: bool
+        """
+        # Read the hazard information
+        with open(hazardPath, 'rb') as file:
+            [im, s, apoe] = pickle.load(file)
+            im = np.array(im)
+            s = np.array(s)
+            apoe = np.array(apoe)
+
+        # Read the fundamental period of the structure
+        with open(MApath) as f:
+            results = json.load(f)
+            period = results["Periods"][0]
+
+        # IPBSD results
+        with open(ipbsdPath, "rb") as f:
+            ipbsd = pickle.load(f)
+
+        # IDA results from the NTHA
+        im_spl = res["im_spl"]
+        disp_range = res["mtdisp"]
+        spl_interp = interp1d(disp_range, im_spl)
+        cap_disp = disp_range[-1]
+        spl_mu = spl_interp(cap_disp)
+        spl_mu = np.sort(spl_mu)
+
+        eta = np.median(spl_mu)
+        beta = np.std(np.log(spl_mu))
+
+        indx_T = int(period * 10)
+
+        l = self.mafe_direct_im_based(eta, beta, s[indx_T], apoe[indx_T])
+        if l <= targetMAFC:
+            print(f"[SUCCESS] Actual MAFC over target MAFC: {l/targetMAFC:.2f}")
+            return True
+        else:
+            print(f"[FAILURE] Actual MAFC over target MAFC: {l/targetMAFC:.2f}")
+            return False
 
 
 if __name__ == "__main__":
@@ -234,10 +369,15 @@ if __name__ == "__main__":
     from pathlib import Path
     directory = Path.cwd()
 
-    path = directory.parents[0] / ".applications/case1/Output/RCMRF/IDA.pickle"
-    IMpath = directory.parents[0] / ".applications/case1/Output/RCMRF/IM.csv"
+    path = directory.parents[0] / ".applications/case1/Output/RCMRF/test/IDA.pickle"
+    IMpath = directory.parents[0] / ".applications/case1/Output/RCMRF/test/IM.csv"
     dursPath = directory.parents[0] / "RCMRF/sample/groundMotion/GMR_durs.txt"
+    hazardPath = directory.parents[0] / ".applications/case1/Hazard-LAquila-Soil-C.pkl"
+    MApath = directory.parents[0] / ".applications/case1/Output/RCMRF/test/MA.json"
+    ipbsdPath = Path.cwd().parents[0] / ".applications/case1/Output/Cache/ipbsd.pickle"
     export = True
+    targetMAFC = 2.e-4
 
     p = Postprocessor(path, export=export)
-    results = p.ida(IMpath, dursPath)
+    results, cache = p.ida(IMpath, dursPath)
+    successFailure = p.verify_mafc(cache, hazardPath, targetMAFC, MApath, ipbsdPath)
