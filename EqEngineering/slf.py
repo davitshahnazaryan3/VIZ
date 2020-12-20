@@ -44,14 +44,14 @@ class SLF:
                 loss, edp_cols, edp_range = self.slfs_csv()
                 # Generate figure/s
                 figs = self.plot_csv(loss, edp_range, edp_cols)
-                return figs, edp_cols
+                return figs, edp_cols, loss, None
             
             elif not os.path.isdir(self.path / file) and (file.endswith(".pickle") or file.endswith(".pkl")):
                 # Read the SLFs
                 loss, edps = self.slfs_pickle()
                 # Generate figure/s
                 figs, names = self.plot_pickle(loss, edps)
-                return figs, names
+                return figs, names, loss, edps
 
             else:
                 raise ValueError("[EXCEPTION] Wrong SLF file format provided! Should be .csv or .pickle")
@@ -295,6 +295,7 @@ class SLF:
                     xlabel = r"Peak Floor Acceleration, (PFA), $a$ [g]"
                     xlim = [0, 4.0]
                 ylim = [0, max(y) + 50.]
+                ylim = [0, 140.]
 
                 ax.plot(edp, y, color=self.color_grid[2], label=label)
                 ax.set_xlabel(xlabel)
@@ -329,12 +330,12 @@ class SLF:
         names = []
         for file in os.listdir(self.path):
             if not os.path.isdir(self.path / file) and not file.endswith(".csv") and not file.endswith(".xlsx"):
-                print(file)
+                
                 # Open slf file
                 f = open(self.path / file, "rb")
                 data = pickle.load(f)
                 f.close()
-
+                
                 # EDP range
                 edp_range = data["edp"]
 

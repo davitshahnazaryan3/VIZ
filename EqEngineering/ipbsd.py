@@ -212,7 +212,11 @@ class IPBSD:
         return fig
 
     def spo2ida(self, data):
-
+        """
+        SPO2IDA plotter
+        :param data: pickle
+        :return: figure object
+        """
         R16 = data["R16"]
         R50 = data["R50"]
         R84 = data["R84"]
@@ -267,6 +271,11 @@ class IPBSD:
         return fig
 
     def spo(self, data):
+        """
+        SPO plotter
+        :param data: pickle
+        :return: figure object
+        """
         model = data["SPO"]
         spo = data["SPO_idealized"]
 

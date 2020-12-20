@@ -36,15 +36,17 @@ class SeismicMaster:
         if self.exportMiser:
             self.plotter.plot_as_png(fig, filename=self.exportDir / name)
 
-    def hazard(self, path, true=True, pathFitted=None, fitted=False, period=None, rp=None):
+    def hazard(self, path, true=True, pathFitted=None, pathCoefs=None, fitted=False, period=None, rp=None, both=False):
         """
         Calls a Hazard object
         :param path: str                    Path to file
         :param true: bool                   Plot true hazard function
         :param pathFitted: str              Path to fitted function
+        :param pathCoefs: str               Path to fitted function coefficients
         :param fitted: bool                 Plot 2-nd order fitted function
         :param period: float                Period of interest to highlight
         :param rp: list(float)              Return periods to highlight on the graphs
+        :param both: bool                   Plots seismic hazard of true and fitted functions
         :return: None
         """
         # Call the Hazard object
@@ -58,8 +60,20 @@ class SeismicMaster:
         if fitted:
             with open(pathFitted, "rb") as f:
                 h = pickle.load(f)
-            fig = hazard.fitted_hazard(h)
+            with open(pathCoefs, "rb") as f:
+                coefs = pickle.load(f)
+            fig = hazard.fitted_hazard(h, coefs)
             self.exportFigure(fig, "fittedHazard")
+
+        if both:
+            with open(path, "rb") as f:
+                h = pickle.load(f)
+            with open(pathFitted, "rb") as f:
+                fitted = pickle.load(f)
+            with open(pathCoefs, "rb") as f:
+                coefs = pickle.load(f)
+            fig = hazard.both_hazard(h, fitted, coefs)
+            self.exportFigure(fig, "Hazard")
 
         if self.export or self.exportMiser:
             print("[SUCCESS] Hazard functions have been exported!")
@@ -80,14 +94,20 @@ class SeismicMaster:
         """
         slf = SLF(path, nst, n_to_plot, geometry, normalizeCost)
         if pflag:
-
+            loss = None
+            
             if detailedSLF:
                 figs, names = slf.slfs_detailed()
             else:
-                figs, names = slf.read_slfs()
+                figs, names, loss, edps = slf.read_slfs()
 
             for i in range(len(figs)):
                 self.exportFigure(figs[i], names[i])
+                if loss is not None:
+                    with open(self.exportDir / "SLF_losses.pickle", "wb") as handle:
+                        pickle.dump(loss, handle)
+                    with open(self.exportDir / "SLF_edps.pickle", "wb") as handle:
+                        pickle.dump(edps, handle)
 
         if self.export or self.exportMiser:
             print("[SUCCESS] Storey loss functions have been exported!")
@@ -202,8 +222,8 @@ class SeismicMaster:
         # RCMRF IDA plotter
         if ida_rcmrfPath is not None:
             with open(ida_rcmrfPath, "rb") as f:
-                fits = pickle.load(f)
-            fig = ida.disp_vs_im(fits)
+                ida_cache = pickle.load(f)
+            fig = ida.disp_vs_im(ida_cache)
             self.exportFigure(fig, "ida_rcmrf_disp_im")
 
             # Comparing SPO2IDA and Model IDA results
@@ -214,5 +234,5 @@ class SeismicMaster:
                     ipbsd = pickle.load(f)
                 with open(spo2idaPath, "rb") as f:
                     spo2ida = pickle.load(f)
-                fig = ida.spo2ida_model(fits, spo, ipbsd, spo2ida)
+                fig = ida.spo2ida_model(ida_cache, spo, ipbsd, spo2ida)
                 self.exportFigure(fig, "ida_spo2ida")

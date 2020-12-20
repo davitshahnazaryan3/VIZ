@@ -46,7 +46,7 @@ class Hazard:
             plt.loglog(data[1][periodIndex], data[2][periodIndex], color=self.color_grid[i],
                        label=f"PSHA, {labelAdd}", marker=self.markers[i])
 
-        if not self.rp:
+        if self.rp:
             for i in self.rp:
                 plt.plot([0.01, 10.1], [1/i, 1/i], ls='--', color=self.gray)
                 self.add_text(ax, 0.011, 1.5/i, f'Return period: {i} years', color=self.gray, ha='left')
@@ -67,10 +67,109 @@ class Hazard:
 
         return fig
 
-    def fitted_hazard(self, data):
+    def fitted_hazard(self, data, coefs):
         """
         Initialize hazard
         :param data: pickle                 Hazard file (*.pickle)
+        :param coefs: pickle                Coefficients of fitted hazard
         """
         # Placeholder
         pass
+
+    def both_hazard(self, true, fitted, coefs):
+        """
+        Plots the hazard function
+        :param true: pickle                 True hazard file (*.pickle)
+        :param fitted: pickle               Fitted hazard file (*.pickle)
+        :param coefs: pickle                Coefficients of fitted hazard
+        :return: figure object
+        """
+        hazard_fit = fitted["hazard_fit"]
+        hazard_s = fitted["s"]
+        hazard_T = fitted["T"]
+        im, s, apoe = true
+
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=100)
+        if self.period:
+            for i in range(len(self.period)):
+                # ID corresponding to the period
+                idx = int(self.period[i] * 10)
+                # Labels
+                labelAdd = f"PSHA, T={self.period[i]:.2f}s" if self.period[i] > 0.0 else "PSHA, PGA"
+                labelAdd_2nd = r"Sa(%.2fs), $2^{nd}$ order fit" % self.period[i] if self.period[i] > 0.0 \
+                    else r"PGA, $2^{nd}$ order fit"
+                labelAdd_1st = r"Sa(%.2fs), $1^{st}$ order fit" % self.period[i] if self.period[i] > 0.0 \
+                    else r"PGA, $1^{st}$ order fit"
+
+                # Tag for the hazard to select
+                if self.period[i] > 0.0:
+                    try:
+                        hazardTag = f"SA({self.period[i]:.2f})"
+                        apoeFit = np.array(hazard_fit[hazardTag])
+                        coef = coefs[hazardTag]
+                    except:
+                        hazardTag = f"SA({self.period[i]:.1f})"
+                        apoeFit = np.array(hazard_fit[hazardTag])
+                        coef = coefs[hazardTag]
+                else:
+                    hazardTag = "PGA"
+                    apoeFit = np.array(hazard_fit[hazardTag])
+                    coef = coefs[hazardTag]
+
+                # 1st order fits
+                h1, hx, saT1x = self.linearFit(coef, hazard_s)
+
+                # Plotting
+                plt.scatter(s[idx], apoe[idx], color=self.color_grid[i], label=labelAdd, marker=self.markers[i])
+                plt.loglog(hazard_s, apoeFit, color=self.color_grid[i], label=labelAdd_2nd)
+                plt.loglog(hazard_s, h1, color=self.color_grid[i], label=labelAdd_1st, ls="--", lw=0.8)
+                if i == 0:
+                    labelScatter = "Fitting points"
+                else:
+                    labelScatter = None
+                plt.scatter(saT1x, hx, marker='x', c='k', zorder=10, s=40, label=labelScatter)
+
+        if self.rp:
+            for i in self.rp:
+                plt.plot([0.01, 10.1], [1/i, 1/i], ls='--', color=self.gray)
+                self.add_text(ax, 0.011, 1.5/i, f'Return period: {i} years', color=self.gray, ha='left')
+
+        plt.ylabel('Annual probability of\n exceedance, ' + r'$H$', fontsize=12)
+        plt.xlabel(r'Intensity, $s$ [g]', fontsize=12)
+        plt.ylim(10e-6, 1)
+        plt.xlim(0.01, 10.1)
+        plt.xticks([])
+        plt.xticks(np.array([0.01, 0.1, 1.0, 10]))
+        plt.rc('xtick', labelsize=14)
+        plt.rc('ytick', labelsize=14)
+        plt.legend(frameon=False,
+                   loc='upper right',
+                   fontsize=12,
+                   bbox_to_anchor=(1.55, 1))
+
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.grid(True, which="major", ls="--", lw=0.4, dashes=(5, 10))
+
+        return fig
+
+    def linearFit(self, coef, sa):
+        """
+        1st order linear fit
+        :param coef: pickle
+        :param sa: ndarray
+        :return: ndarrays
+        """
+        k0 = coef["k0"]
+        k1 = coef["k1"]
+        k2 = coef["k2"]
+        TR = np.array([475, 10000])
+        H = np.array([1 / tr for tr in TR])
+        SaT1 = np.exp((-k1 + np.sqrt(k1 ** 2 - 4 * k2 * np.log(H / k0))) / 2 / k2)
+
+        kl0 = abs((np.log(H[0]) - np.log(H[1])) / (np.log(SaT1[0]) - np.log(SaT1[1])))
+        kl00 = H[0] / np.exp(-kl0 * np.log(SaT1[0]))
+
+        H_linear = kl00 * np.exp(-kl0 * np.log(sa))
+
+        return H_linear, H, SaT1
