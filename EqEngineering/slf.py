@@ -191,7 +191,7 @@ class SLF:
                         if not key.startswith("SLF"):
                             loss = df[key]["slfs"]["mean"]
                             SLFs[non_dir]["PFA_NS"][str(int(story) - 1)] = {"loss": loss,
-                                                                            "edp": df[key]["fragilities"]["EDP"]}
+                                                                            "edp": df[key]["edp"]}
                             try:
                                 pfa = df[key]["fragilities"]["EDP"]
                             except:
@@ -214,13 +214,12 @@ class SLF:
                                     SLFs[non_dir][tag]["dir" + direction] = {}
                                 loss = df[key]["slfs"]["mean"]
                                 SLFs[non_dir][tag]["dir" + direction].update({story: {"loss": loss,
-                                                                                      "edp": df[key]["fragilities"][
-                                                                                          "EDP"]}})
+                                                                                      "edp": df[key]["edp"]}})
 
                             else:
                                 loss = df[key]["slfs"]["mean"]
                                 SLFs[non_dir][tag].update({story: {"loss": loss,
-                                                                   "edp": df[key]["fragilities"]["EDP"]}})
+                                                                   "edp": df[key]["edp"]}})
 
                             try:
                                 psd = df[key]["fragilities"]["EDP"]

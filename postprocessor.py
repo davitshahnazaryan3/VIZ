@@ -4,6 +4,7 @@ Postprocessing of results
 import pickle
 import numpy as np
 import pandas as pd
+import os
 import math
 from scipy.stats import lognorm
 import json
@@ -11,11 +12,15 @@ from scipy.interpolate import interp1d
 
 
 class Postprocessor:
-    def __init__(self, path, export=True):
+    def __init__(self, path, export=True, flag3d=False):
         """
-        :param path: str                    IDA results directory"""
+        :param path: str                    IDA results directory
+        :param export: bool                 Exporting postprocessed IDA results or not
+        :param flag3d: bool                 Run IDA for 3D or not
+        """
         self.path = path
         self.export = export
+        self.flag3d = flag3d
 
     def export_results(self, filepath, data, filetype):
         """
@@ -100,18 +105,33 @@ class Postprocessor:
         2.1 ground motions (n_rec keys) -> IM levels (n_runs keys) -> maxFA, maxISDR (2 keys) -> 
         -> number of storeys (nst for maxISDR) /floors (nst+1 for maxFA) keys -> a single value
         """
-        # Read the IDA outputs
-        with open(self.path, 'rb') as file:
-            data = pickle.load(file)
-
-        # Read the IDA IM levels
-        IM = np.genfromtxt(IMpath, delimiter=',')
-
         # Read the durations of the records
         durs = list(pd.read_csv(dursPath, header=None)[0])
 
         # Number of records
-        nrecs = len(data)
+        nrecs = len(durs)
+
+        # Read the IDA outputs
+        if os.path.isdir(self.path):
+            data = {}
+            for rec in range(nrecs):
+                data[rec] = {}
+
+            for filename in os.listdir(self.path):
+                # With no particular order
+                base_filename = os.path.basename(filename).replace(".pickle", "").replace("Record", "").\
+                    replace("Run", "").split("_")
+                rec = int(base_filename[0]) - 1
+                run = int(base_filename[1])
+                with open(self.path / filename, 'rb') as file:
+                    data[rec][run] = pickle.load(file)
+        else:
+            with open(self.path, 'rb') as file:
+                data = pickle.load(file)
+
+        # Read the IDA IM levels
+        IM = np.genfromtxt(IMpath, delimiter=',')
+
         # Number of runs per each record
         nruns = len(data[list(data.keys())[0]])
 
@@ -130,106 +150,118 @@ class Postprocessor:
         # Initialize target dictionary with its first stage
         res = {'IDA': {}, 'summary_results': {}}
         resKeys = list(res.keys())
+        cache = {}
+        results = {}
 
-        # Loop for each record
-        for rec in range(1, nrecs+1):
-            print("gm_%s" % rec)
-            
-            # Second stage of the dictionary
-            res[resKeys[0]][rec] = {'IM': [], 'ISDR': [], 'PFA': [], 'RISDR': []}
-            res[resKeys[1]][rec] = {}
+        n_dir = 2 if self.flag3d else 1
+        # Loop for each direction for a 3D model
+        for d in range(n_dir):
+            cache[d] = {}
+            results[d] = {}
+            # Loop for each record
+            for rec in range(1, nrecs+1):
+                print("gm_%s" % rec)
 
-            # Add IM values into the results file
-            res[resKeys[0]][rec]["IM"] = IM[rec - 1]
+                # Second stage of the dictionary
+                res[resKeys[0]][rec] = {'IM': [], 'ISDR': [], 'PFA': [], 'RISDR': []}
+                res[resKeys[1]][rec] = {}
 
-            # Sort the IM values
-            im[rec - 1, 1:] = np.sort(IM[rec - 1])
-            idx[rec - 1, :] = np.argsort(IM[rec - 1])
-            print(im[rec-1], IM[rec-1])
-            # Third stage of the dictionary
-            for i in im[rec - 1, 1:]:
-                i = str(np.round(i, 2))
-                res[resKeys[1]][rec][i] = {'maxFA': {}, 'maxISDR': {}, 'maxRISDR': {}}
+                # Add IM values into the results file
+                res[resKeys[0]][rec]["IM"] = IM[rec - 1]
 
-            # Loop over each run
-            for run in range(1, nruns + 1):
-                # Select analysis results of rec and run
-                selection = data[rec - 1][run]
+                # Sort the IM values
+                im[rec - 1, 1:] = np.sort(IM[rec - 1])
+                idx[rec - 1, :] = np.argsort(IM[rec - 1])
 
-                # Get PFAs in g
-                pfa = np.amax(abs(selection[0][:, 1:]), axis=1)
+                # Third stage of the dictionary
+                for i in im[rec - 1, 1:]:
+                    i = str(np.round(i, 2))
+                    res[resKeys[1]][rec][i] = {'maxFA': {}, 'maxISDR': {}, 'maxRISDR': {}}
 
-                # IML in g
-                iml = str(np.round(IM[rec - 1][run - 1], 2))
+                # Loop over each run
+                for run in range(1, nruns + 1):
+                    # Select analysis results of rec and run
+                    selection = data[rec - 1][run]
 
-                for st in range(len(pfa)):
-                    res[resKeys[1]][rec][iml]["maxFA"][st] = pfa[st]
-                mpfa_us[rec - 1, run - 1] = max(pfa)
+                    # Get PFAs in g
+                    pfa = np.amax(abs(selection[0][:, 1:]), axis=n_dir)[d]
 
-                # Get PSDs in %
-                psd = np.amax(abs(selection[2]), axis=1)
+                    # IML in g
+                    iml = str(np.round(IM[rec - 1][run - 1], 2))
 
-                for st in range(len(psd)):
-                    res[resKeys[1]][rec][iml]["maxISDR"][st + 1] = psd[st]
-                mpsd_us[rec - 1, run - 1] = max(psd)
-                print(max(psd))
-                # Getting the residual PSDs in %
-                # Analysis time step
-                dt = (durs[rec - 1] + res_time) / selection[0].shape[1]
-                idxres = int((durs[rec - 1] - res_time) / dt)
-                
-                resDrifts = selection[2][:, idxres:]
-                for st in range(len(psd)):
-                    res[resKeys[1]][rec][iml]["maxRISDR"][st + 1] = sum(resDrifts[st]) / len(resDrifts[st])
-                # Record the peak value of residual drift at each run for each record
-                mrpsd_us[rec - 1, run - 1] = max(np.sum(resDrifts, axis=1) / resDrifts.shape[1])
-                
-                # Get the top displacement in m
-                top_disp = np.amax(abs(selection[1]), axis=1)
-                mtdisp_us[rec - 1, run - 1] = top_disp[-1]
+                    for st in range(len(pfa)):
+                        res[resKeys[1]][rec][iml]["maxFA"][st] = pfa[st]
+                    mpfa_us[rec - 1, run - 1] = max(pfa)
 
-            # Sort the results
-            res["IDA"][rec]["PFA"] = mpfa_us[rec - 1, :]
-            res["IDA"][rec]["ISDR"] = mpsd_us[rec - 1, :]
-            res["IDA"][rec]["RISDR"] = mrpsd_us[rec - 1, :]
+                    # Get PSDs in %
+                    psd = np.amax(abs(selection[2]), axis=n_dir)[d]
 
-            # Repopulate nans with max of data
-            # res["IDA"][rec]["RISDR"] = [max(res['IDA'][rec]['RISDR']) if math.isnan(x) else x for
-            # x in res['IDA'][rec]['RISDR']]
+                    for st in range(len(psd)):
+                        res[resKeys[1]][rec][iml]["maxISDR"][st + 1] = psd[st]
+                    mpsd_us[rec - 1, run - 1] = max(psd)
 
-            mpfa[rec - 1, 1:] = mpfa_us[rec - 1, :][idx[rec - 1]]
-            mpsd[rec - 1, 1:] = mpsd_us[rec - 1, :][idx[rec - 1]]
-            mtdisp[rec - 1, 1:] = mtdisp_us[rec - 1, :][idx[rec - 1]]
-            wqewqe
-        # Fit the splines to the data
-        mtdisp_range = np.linspace(0.01, 1, 200)
+                    # Getting the residual PSDs in %
+                    # Analysis time step
+                    dt = (durs[rec - 1] + res_time) / selection[0].shape[1]
+                    idxres = int((durs[rec - 1] - res_time) / dt)
 
-        # Quantile ranges to visualize for the IDAs
-        qtile_range = np.array([0.16, 0.5, 0.84])
+                    if self.flag3d:
+                        resDrifts = selection[2][:, :, idxres:][d]
+                    else:
+                        resDrifts = selection[2][:, idxres:]
 
-        im_spl = np.zeros([nrecs, len(mtdisp_range)])
-        im_spl[:] = np.nan
+                    for st in range(len(psd)):
+                        res[resKeys[1]][rec][iml]["maxRISDR"][st + 1] = sum(resDrifts[st]) / len(resDrifts[st])
+                    # Record the peak value of residual drift at each run for each record
+                    mrpsd_us[rec - 1, run - 1] = max(np.sum(resDrifts, axis=1) / resDrifts.shape[1])
 
-        # Get the fitted IDA curves for each record
-        for rec in range(nrecs):
-            interpolator = interp1d(mtdisp[rec], im[rec])
+                    # Get the top displacement in m
+                    top_disp = np.amax(abs(selection[1]), axis=n_dir)[d]
+                    mtdisp_us[rec - 1, run - 1] = top_disp[-1]
 
-            for i in range(len(mtdisp_range)):
-                if mtdisp_range[i] <= max(mtdisp[rec]):
-                    im_spl[rec][i] = interpolator(mtdisp_range[i])
-                    if im_spl[rec][i] < im_spl[rec][i - 1]:
+                # Sort the results
+                res["IDA"][rec]["PFA"] = mpfa_us[rec - 1, :]
+                res["IDA"][rec]["ISDR"] = mpsd_us[rec - 1, :]
+                res["IDA"][rec]["RISDR"] = mrpsd_us[rec - 1, :]
+
+                # Repopulate nans with max of data
+                # res["IDA"][rec]["RISDR"] = [max(res['IDA'][rec]['RISDR']) if math.isnan(x) else x for
+                # x in res['IDA'][rec]['RISDR']]
+
+                mpfa[rec - 1, 1:] = mpfa_us[rec - 1, :][idx[rec - 1]]
+                mpsd[rec - 1, 1:] = mpsd_us[rec - 1, :][idx[rec - 1]]
+                mtdisp[rec - 1, 1:] = mtdisp_us[rec - 1, :][idx[rec - 1]]
+
+            # Fit the splines to the data
+            mtdisp_range = np.linspace(0.01, 1, 200)
+
+            # Quantile ranges to visualize for the IDAs
+            qtile_range = np.array([0.16, 0.5, 0.84])
+
+            im_spl = np.zeros([nrecs, len(mtdisp_range)])
+            im_spl[:] = np.nan
+
+            # Get the fitted IDA curves for each record
+            for rec in range(nrecs):
+                interpolator = interp1d(mtdisp[rec], im[rec])
+
+                for i in range(len(mtdisp_range)):
+                    if mtdisp_range[i] <= max(mtdisp[rec]):
+                        im_spl[rec][i] = interpolator(mtdisp_range[i])
+                        if im_spl[rec][i] < im_spl[rec][i - 1]:
+                            im_spl[rec][i] = im_spl[rec][i - 1]
+                    else:
                         im_spl[rec][i] = im_spl[rec][i - 1]
-                else:
-                    im_spl[rec][i] = im_spl[rec][i - 1]
 
-        # Get the IDA quantiles
-        im_qtile = np.zeros([len(qtile_range), len(mtdisp_range)])
-        for q in range(len(qtile_range)):
-            for i in range(len(mtdisp_range)):
-                im_qtile[q][i] = np.quantile(im_spl[:, i], qtile_range[q])
+            # Get the IDA quantiles
+            im_qtile = np.zeros([len(qtile_range), len(mtdisp_range)])
+            for q in range(len(qtile_range)):
+                for i in range(len(mtdisp_range)):
+                    im_qtile[q][i] = np.quantile(im_spl[:, i], qtile_range[q])
 
-        # Creating a dictionary for the spline fits
-        cache = {"im_spl": im_spl, "disp": mtdisp, "im": im, "im_qtile": im_qtile, "mtdisp": mtdisp_range}
+            # Creating a dictionary for the spline fits
+            cache[d] = {"im_spl": im_spl, "disp": mtdisp, "im": im, "im_qtile": im_qtile, "mtdisp": mtdisp_range}
+            results[d] = res
 
         # Exporting
         if self.export:
@@ -239,7 +271,7 @@ class Postprocessor:
         else:
             print("[SUCCESS] Postprocesssing complete.")
 
-        return res, cache
+        return results, cache
 
     def ida_im_based(self, IMpath, dursPath, res_time=10.):
         """
@@ -536,6 +568,7 @@ class Postprocessor:
         # Median and standard deviation of the collapse IM distribution
         eta = np.median(spl_mu)
         beta = np.std(np.log(spl_mu))
+        print(f"Collapse capacity: eta={eta:.2f}, beta_RTR={beta:.2f}, period={period:.2f}")
 
         indx_T = int(period * 10)
 
@@ -552,17 +585,19 @@ if __name__ == "__main__":
 
     from pathlib import Path
     directory = Path.cwd()
-    resultsDir = directory.parents[0] / ".applications/case1/Output1/RCMRF"
+    resultsDir = directory.parents[0] / ".applications/LOSS Validation Manuscript/case2/RCMRF"
 
-    path = resultsDir / "IDA.pickle"
+    idx = 0
+    path = resultsDir / "NLTHA"
     IMpath = resultsDir / "IM.csv"
     dursPath = directory.parents[0] / "RCMRF/sample/groundMotion/GMR_durs.txt"
-    hazardPath = resultsDir.parents[1] / "Hazard-LAquila-Soil-C.pkl"
+    hazardPath = resultsDir.parents[1+idx] / "Hazard-LAquila-Soil-C.pkl"
     MApath = resultsDir / "MA.json"
-    ipbsdPath = resultsDir.parents[0] / "Cache/ipbsd.pickle"
-    export = True
+    ipbsdPath = resultsDir.parents[1+idx] / "Output1/Cache/ipbsd.pickle"
+    export = False
+    flag3d = True
     targetMAFC = 2.e-4
 
-    p = Postprocessor(path, export=export)
+    p = Postprocessor(path, export=export, flag3d=flag3d)
     results, cache = p.ida(IMpath, dursPath)
-    successFailure = p.verify_mafc(cache, hazardPath, targetMAFC, MApath, ipbsdPath)
+    successFailure = p.verify_mafc(cache[0], hazardPath, targetMAFC, MApath, ipbsdPath)

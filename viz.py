@@ -29,10 +29,11 @@ class VIZ:
 
 if __name__ == "__main__":
 
+    # TODO, at the moment pflag is gatekeeping export of results as well, modify to trigger only plotting
     """Most of the input manipulation and method calling happens here for now, until a GUI 
     (even a simple one) is created"""
     # Calling the master object
-    exportDir = Path.cwd().parents[0] / ".applications/case1/figures"
+    exportDir = Path.cwd().parents[0] / ".applications/LOSS Validation Manuscript/Case2/Cache/slfoutput"
     viz = VIZ(exportDir)
 
     # Call the earthquake engineering master file
@@ -48,8 +49,9 @@ if __name__ == "__main__":
     #                true=False, fitted=False, both=True)
 
     # # SLF plotting
-    path = Path.cwd().parents[0] / ".applications/case1/Output/slfoutput"
-    nst = 5
+    path = Path.cwd().parents[0] / ".applications/LOSS Validation Manuscript/Case2/slfoutput"
+    viz.create_folder(path)
+    nst = 4
     seismic.slfs(path, nst=nst, detailedSLF=False)
 
     # SPO plotting
