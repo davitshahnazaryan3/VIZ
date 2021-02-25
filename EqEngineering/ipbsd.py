@@ -1,6 +1,7 @@
 """
 Generate intermediate steps of IPBSD framework
 """
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -13,6 +14,11 @@ class IPBSD:
         self.FONTSIZE = 10
         self.grayscale = ['#111111', '#222222', '#333333', '#444444', '#555555',
                           '#656565', '#767676', '#878787', '#989898', '#a9a9a9']
+        
+        # Set default font style
+        font = {'size': 10}
+        matplotlib.rc('font', **font)
+
 
     def lossCurve(self, data):
         """
@@ -270,19 +276,41 @@ class IPBSD:
 
         return fig
 
-    def spo(self, data):
+    def spo(self, data, sol=None, spo2ida=None, n_seismic=2):
         """
         SPO plotter
         :param data: pickle
+        :param sol: dict
+        :param spo2ida: dict
+        :param n_seismic: int
         :return: figure object
         """
+        # IPBSD outputs
+        if sol is not None:
+           # Yield Sa (SDOF) (used for designing the structure), reference value
+            cy = sol["yield"][0]
+            # Yield Sa (MDOF) including overstrength factor
+            say = cy * sol["overstrength"] * sol["part_factor"]
+            # Yield displacement (MDOF)
+            dy = sol["yield"][1] * sol["overstrength"] * sol["part_factor"]
+            # Yield base shear
+            Vy = 9.81 * sol["Mstar"] * say
+        period = 2*np.pi*np.sqrt(sol["yield"][1]/cy/9.81)
+        print(f"[PERIOD] {period:.2f}")
+        # Nonlinear model outputs
         model = data["SPO"]
         spo = data["SPO_idealized"]
-
         fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
         plt.plot(spo[0]*100, spo[1], color=self.grayscale[0], label="Idealized shape")
         plt.plot(model[0]*100, model[1], color=self.grayscale[-2], label="Nonlinear model")
-
+        if spo2ida is not None and sol is not None:
+            # Plotting the SPO2IDA shape
+            plt.plot(spo2ida["spom"] * dy * 100, spo2ida["spor"] * Vy * n_seismic, 
+                     color="r", ls="--", label="SPO, design")
+        
+        
+        plt.plot(model[0]*100, model[1] / model[0] / 100)
+    
         plt.xlabel("Top displacement [cm] ", fontsize=self.FONTSIZE)
         plt.ylabel('Base shear [kN]', fontsize=self.FONTSIZE)
         plt.grid(True, which="major", axis='both', ls="--", lw=1.0)

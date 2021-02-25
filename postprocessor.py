@@ -118,13 +118,14 @@ class Postprocessor:
                 data[rec] = {}
 
             for filename in os.listdir(self.path):
-                # With no particular order
-                base_filename = os.path.basename(filename).replace(".pickle", "").replace("Record", "").\
-                    replace("Run", "").split("_")
-                rec = int(base_filename[0]) - 1
-                run = int(base_filename[1])
-                with open(self.path / filename, 'rb') as file:
-                    data[rec][run] = pickle.load(file)
+                if os.path.isfile(self.path / filename):
+                    # With no particular order
+                    base_filename = os.path.basename(filename).replace(".pickle", "").replace("Record", "").\
+                        replace("Run", "").split("_")
+                    rec = int(base_filename[0]) - 1
+                    run = int(base_filename[1])
+                    with open(self.path / filename, 'rb') as file:
+                        data[rec][run] = pickle.load(file)
         else:
             with open(self.path, 'rb') as file:
                 data = pickle.load(file)
@@ -260,12 +261,13 @@ class Postprocessor:
                     im_qtile[q][i] = np.quantile(im_spl[:, i], qtile_range[q])
 
             # Creating a dictionary for the spline fits
-            cache[d] = {"im_spl": im_spl, "disp": mtdisp, "im": im, "im_qtile": im_qtile, "mtdisp": mtdisp_range}
-            results[d] = res
+            cache[d] = {"im_spl": im_spl.copy(), "disp": mtdisp.copy(), "im": im.copy(), "im_qtile": im_qtile.copy(),
+                        "mtdisp": mtdisp_range.copy()}
+            results[d] = res.copy()
 
         # Exporting
         if self.export:
-            self.export_results(self.path.parents[0] / "ida_processed", res, "pickle")
+            self.export_results(self.path.parents[0] / "ida_processed", results, "pickle")
             self.export_results(self.path.parents[0] / "ida_cache", cache, "pickle")
             print("[SUCCESS] Postprocesssing complete. Results have been exported!")
         else:
@@ -526,7 +528,7 @@ class Postprocessor:
         l = sum(dl)
         return l
 
-    def verify_mafc(self, res, hazardPath, targetMAFC, MApath, ipbsdPath):
+    def verify_mafc(self, res, hazardPath, targetMAFC, MApath, ipbsdPath, period=None):
         """
         Verifies that MAFC is below the target value
         :param res: pickle
@@ -534,6 +536,7 @@ class Postprocessor:
         :param targetMAFC: float
         :param MApath: str
         :param ipbsdPath: str
+        :param period: float
         :return: bool
         """
         # Read the hazard information
@@ -544,9 +547,10 @@ class Postprocessor:
             apoe = np.array(apoe)
 
         # Read the fundamental period of the structure
-        with open(MApath) as f:
-            results = json.load(f)
-            period = results["Periods"][0]
+        if period is None:
+            with open(MApath) as f:
+                results = json.load(f)
+                period = results["Periods"][0]
 
         # IPBSD results
         with open(ipbsdPath, "rb") as f:
@@ -585,19 +589,25 @@ if __name__ == "__main__":
 
     from pathlib import Path
     directory = Path.cwd()
-    resultsDir = directory.parents[0] / ".applications/LOSS Validation Manuscript/case2/RCMRF"
+    resultsDir = directory.parents[0] / ".applications/LOSS Validation Manuscript/case21/RCMRF"
 
-    idx = 0
     path = resultsDir / "NLTHA"
     IMpath = resultsDir / "IM.csv"
     dursPath = directory.parents[0] / "RCMRF/sample/groundMotion/GMR_durs.txt"
-    hazardPath = resultsDir.parents[1+idx] / "Hazard-LAquila-Soil-C.pkl"
+    hazardPath = resultsDir.parents[0] / "Hazard-LAquila-Soil-C.pkl"
     MApath = resultsDir / "MA.json"
-    ipbsdPath = resultsDir.parents[1+idx] / "Output1/Cache/ipbsd.pickle"
-    export = False
+    # ipbsdPath = resultsDir.parents[1] / f"framex/ipbsd.pickle"
+    export = True
     flag3d = True
     targetMAFC = 2.e-4
-
+    periods = [0.72, 0.60]
+    
     p = Postprocessor(path, export=export, flag3d=flag3d)
     results, cache = p.ida(IMpath, dursPath)
-    successFailure = p.verify_mafc(cache[0], hazardPath, targetMAFC, MApath, ipbsdPath)
+    
+    for i in ["x", "y"]:
+        # Path to IPBSD outputs
+        ipbsdPath = resultsDir.parents[0] / f"Cache/frame{i}/ipbsd.pickle"
+        # Verify MAFC
+        idx = 0 if i == "x" else 1
+        successFailure = p.verify_mafc(cache[idx], hazardPath, targetMAFC, MApath, ipbsdPath, period=periods[idx])

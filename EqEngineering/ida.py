@@ -75,7 +75,7 @@ class IDA:
         # Model Pushover curve
         plt.plot(spo[0] / dy, spo[1] / Vy, color=self.grayscale[2], label="SPO", ls="-")
 
-        # # SPO2IDA plotting
+        # SPO2IDA plotting
         plt.plot(spo2ida["spom"], spo2ida["spor"], color=self.grayscale[2], ls="--", label="SPO, design")
         plt.plot(spo2ida["idacm"][0], spo2ida["idacr"][0], color="b", label="84th, design", ls="--")
         plt.plot(spo2ida["idacm"][1], spo2ida["idacr"][1], color="r", label="50th, design", ls="--")

@@ -176,7 +176,17 @@ class SeismicMaster:
         if spoModelPath is not None:
             with open(spoModelPath, "rb") as f:
                 spo = pickle.load(f)
-            fig = ipbsd.spo(spo)
+                if solutionPath is not None:
+                    with open(solutionPath, "rb") as f:
+                        sol = pickle.load(f)
+                else:
+                    sol = None
+                if spo2idaPath is not None:
+                    with open(spo2idaPath, "rb") as f:
+                        spo2ida = pickle.load(f)
+                else:
+                    spo2ida = None
+            fig = ipbsd.spo(spo, sol, spo2ida)
             self.exportFigure(fig, "spo")
 
         # --------------------------------------------------------------------
